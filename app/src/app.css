@@ -1,0 +1,121 @@
+/* MAKROskop design tokens — light first, dark via media query */
+:root {
+	color-scheme: light;
+
+	/* identity: MAKRO's own brand teal (from the model repo), UI-only — never a data series color */
+	--makro: #0f9a92;
+	--makro-strong: #0c7f78;
+	--makro-wash: rgba(20, 175, 166, 0.09);
+
+	/* planes */
+	--page: #f5f8f7;
+	--surface: #fcfdfd;
+	--surface-raised: #ffffff;
+
+	/* ink */
+	--ink: #10201e;
+	--ink-secondary: #4c5b58;
+	--ink-muted: #81908c;
+
+	/* chart chrome */
+	--grid: #e2e7e5;
+	--axis: #c2cbc8;
+	--border: rgba(16, 32, 30, 0.1);
+
+	/* data series (validated dataviz reference palette) */
+	--series-1: #2a78d6;
+	--series-2: #eb6834;
+	--series-wash: rgba(42, 120, 214, 0.1);
+
+	/* semantics */
+	--good: #006300;
+	--bad: #d03b3b;
+	--projection-wash: rgba(16, 32, 30, 0.028);
+
+	--font-display: 'Familjen Grotesk', system-ui, sans-serif;
+	--font-body: system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		color-scheme: dark;
+		--makro: #1bc4ba;
+		--makro-strong: #4fd8cf;
+		--makro-wash: rgba(27, 196, 186, 0.1);
+
+		--page: #0e1413;
+		--surface: #161d1c;
+		--surface-raised: #1c2423;
+
+		--ink: #eef3f2;
+		--ink-secondary: #b3c0bd;
+		--ink-muted: #7d8b88;
+
+		--grid: #26302e;
+		--axis: #3a4644;
+		--border: rgba(238, 243, 242, 0.1);
+
+		--series-1: #3987e5;
+		--series-2: #d95926;
+		--series-wash: rgba(57, 135, 229, 0.12);
+
+		--good: #0ca30c;
+		--bad: #e66767;
+		--projection-wash: rgba(238, 243, 242, 0.035);
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--page);
+	color: var(--ink);
+	font-family: var(--font-body);
+	font-size: 15px;
+	line-height: 1.55;
+	-webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+	font-family: var(--font-display);
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	margin: 0;
+	color: var(--ink);
+}
+
+a {
+	color: var(--makro-strong);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+code,
+.mono {
+	font-family: var(--font-mono);
+	font-size: 0.85em;
+}
+
+:focus-visible {
+	outline: 2px solid var(--makro);
+	outline-offset: 2px;
+	border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+	}
+}

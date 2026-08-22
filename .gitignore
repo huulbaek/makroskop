@@ -1,0 +1,15 @@
+# Python (etl)
+etl/.venv/
+__pycache__/
+*.pyc
+
+# Shock GDX drop folder: binary model output, regenerate or fetch — not versioned
+etl/shock_gdx/*.gdx
+
+# Node / SvelteKit (app)
+app/node_modules/
+app/.svelte-kit/
+app/build/
+
+# OS
+.DS_Store
