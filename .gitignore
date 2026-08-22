@@ -13,3 +13,6 @@ app/build/
 
 # OS
 .DS_Store
+
+# freesolver parse cache (regenerate with: uv run python freesolver.py parse)
+etl/cache/

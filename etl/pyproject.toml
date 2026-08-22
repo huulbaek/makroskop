@@ -5,6 +5,7 @@ requires-python = ">=3.12"
 dependencies = [
     "gamsapi[transfer]>=54.3.1",
     "gamspy-base>=54.3.1",
+    "numba>=0.67.0",
     "pandas>=3.0.5",
     "pyarrow>=25.0.1",
 ]
