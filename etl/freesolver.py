@@ -806,86 +806,353 @@ def solve_linear(jac_sorted, rhs: np.ndarray, year_offsets: np.ndarray,
     return solution, info, iterations[0]
 
 
+class Window:
+    """A trailing time-window of the system: equations/free vars with year >= from_year."""
+
+    def __init__(self, system: System, convert_dir: Path, from_year: int):
+        self.from_year = from_year
+        self.n_years = 2130 - from_year
+        eq_year, var_year = load_years(convert_dir, system.n_eq, len(system.levels))
+        self.eq_year = eq_year
+        self.var_year = var_year
+        self.eq_sel = np.where(eq_year >= from_year)[0]
+        free_year = var_year[system.free_ids]
+        var_sel = np.where(free_year >= from_year)[0]
+        assert len(self.eq_sel) == len(var_sel), (len(self.eq_sel), len(var_sel))
+        self.window_vars = system.free_ids[var_sel]
+        self.eq_perm = self.eq_sel[np.argsort(eq_year[self.eq_sel], kind="stable")]
+        var_perm = var_sel[np.argsort(free_year[var_sel], kind="stable")]
+        self.window_vars_sorted = system.free_ids[var_perm]
+        self.var_perm = var_perm
+        sorted_years = np.sort(eq_year[self.eq_sel])
+        self.year_offsets = np.searchsorted(sorted_years, np.arange(from_year, 2131))
+
+    def in_window_eq_mask(self, n_eq: int) -> np.ndarray:
+        mask = np.zeros(n_eq, dtype=bool)
+        mask[self.eq_sel] = True
+        return mask
+
+
+def solve_window(system: System, window: Window, x: np.ndarray,
+                 tol: float = 1e-9, max_iter: int = 10, lu_reuse=None):
+    """Newton on the window, mutating x in place. Returns (final ||r||_inf, last LU).
+
+    A carried-over LU (chord iterations) is tried first and rebuilt from a fresh
+    Jacobian whenever progress is poor — cheap on continuation ladders where the
+    Jacobian barely changes between stages.
+    """
+    from scipy.sparse.linalg import splu
+
+    residual_full = np.empty(system.n_eq)
+    system.residuals(x, residual_full)
+    norm = np.abs(residual_full[window.eq_sel]).max()
+    print(f"start: ||r||_inf = {norm:.3e}", flush=True)
+    lu = lu_reuse
+    fresh = False
+    history: list[float] = [norm]
+
+    for iteration in range(1, max_iter + 1):
+        if norm < tol:
+            break
+        t0 = time.time()
+        if lu is None:
+            jac = system.jacobian_csc(x)
+            jac_window = jac[window.eq_perm, :][:, window.var_perm].tocsc()
+            lu = splu(jac_window)
+            fresh = True
+        factor_time = time.time() - t0
+        dx = lu.solve(-residual_full[window.eq_perm])
+
+        # Non-monotone acceptance: a full Newton step may raise ||r||_inf temporarily
+        # (bilinear cross-terms of large-scale NPV variables) yet be nearly exact in
+        # relative terms — quadratic contraction cleans it up next iteration.
+        reference = min(1e3 * max(history[-3:]), 1e5) if history else np.inf
+        alpha = 1.0
+        accepted = False
+        for _ in range(8):
+            x_try = x.copy()
+            x_try[window.window_vars_sorted] += alpha * dx
+            system.residuals(x_try, residual_full)
+            trial_norm = np.abs(residual_full[window.eq_sel]).max()
+            if np.isfinite(trial_norm) and (trial_norm < norm or (alpha == 1.0 and trial_norm < reference)):
+                accepted = True
+                break
+            alpha *= 0.5
+        if not accepted:
+            system.residuals(x, residual_full)  # restore residual at x
+            if fresh:
+                print("  line search failed with fresh Jacobian; stopping", flush=True)
+                return norm, lu
+            lu = None  # stale chord LU: rebuild and retry
+            continue
+
+        reduction = trial_norm / norm if norm > 0 else 0.0
+        x[:] = x_try
+        norm = trial_norm
+        history.append(norm)
+        note = "fresh" if fresh else "chord"
+        print(f"iter {iteration}: ||r||_inf = {norm:.3e}  ||dx||_inf = {np.abs(dx).max():.3e}  "
+              f"alpha = {alpha}  ({note}, factor {factor_time:.1f}s)", flush=True)
+        # keep the LU for chord iterations only while contraction is strong
+        if not (alpha == 1.0 and reduction <= 0.02):
+            lu = None
+        fresh = False
+    return norm, lu
+
+
+def solve_shock(system: System, window: Window, x: np.ndarray, shock_var: int,
+                target_value: float, tol: float = 1e-9) -> float:
+    """Continuation on shock size: ramp the exogenous variable to its target.
+
+    Mirrors MAKRO's own homotopy trick (solve at 1/100 size, then rescale).
+    """
+    base_value = float(x[shock_var])
+    delta = target_value - base_value
+    solved_share = 0.0
+    step = 0.01
+    checkpoint = x.copy()
+    lu = None
+    attempts = 0
+
+    while solved_share < 1.0 - 1e-12:
+        attempts += 1
+        if attempts > 40:
+            raise SystemExit("continuation gave up after 40 stages")
+        share = min(1.0, solved_share + step)
+        x[:] = checkpoint
+        x[shock_var] = base_value + share * delta
+        print(f"--- continuation: {solved_share:.4f} -> {share:.4f} of shock ---", flush=True)
+        norm, lu = solve_window(system, window, x, tol=tol, max_iter=5, lu_reuse=lu)
+        if norm < tol:
+            solved_share = share
+            checkpoint = x.copy()
+            step = min(step * 2.5, 1.0 - solved_share) or step
+        else:
+            step /= 2
+            lu = None
+            if step < 1e-4:
+                raise SystemExit(f"continuation stalled at share {solved_share}")
+    return tol
+
+
 def cmd_newton(perturb: float, max_iter: int, tol: float, from_year: int, convert_dir: Path) -> None:
     system = System()
-    print(f"window: equations/variables with year >= {from_year}")
-    eq_year, var_year = load_years(convert_dir, system.n_eq, len(system.levels))
-    eq_sel = np.where(eq_year >= from_year)[0]
-    free_year = var_year[system.free_ids]
-    var_sel = np.where(free_year >= from_year)[0]        # indices into free_ids
-    window_vars = system.free_ids[var_sel]               # raw variable ids
-    assert len(eq_sel) == len(var_sel), (len(eq_sel), len(var_sel))
-    print(f"window system: {len(eq_sel):,} equations/unknowns "
-          f"({(2130 - from_year)} years of {system.n_eq:,} total)")
-
-    # year-sorted permutations within the window
-    eq_perm = eq_sel[np.argsort(eq_year[eq_sel], kind="stable")]
-    var_perm = var_sel[np.argsort(free_year[var_sel], kind="stable")]
-    sorted_years = np.sort(eq_year[eq_sel])
-    year_offsets = np.searchsorted(sorted_years, np.arange(from_year, 2131))
-    window_vars_sorted = system.free_ids[var_perm]
-    n_years = 2130 - from_year
-    exact_blocks = n_years <= 30  # ~65MB LU per year block: exact only for small windows
-    direct = n_years <= 12  # direct splu fits ~3.5GB at 10 years on this machine
+    window = Window(system, convert_dir, from_year)
+    print(f"window system: {len(window.eq_sel):,} equations/unknowns "
+          f"({window.n_years} years of {system.n_eq:,} total)")
 
     x = system.levels.copy()
     rng = np.random.default_rng(42)
     if perturb > 0:
-        noise = perturb * (np.abs(x[window_vars]) + 1e-3) * rng.standard_normal(len(window_vars))
-        x[window_vars] += noise
-        print(f"perturbed {len(window_vars):,} window variables, relative scale {perturb:g}")
+        noise = perturb * (np.abs(x[window.window_vars]) + 1e-3) * rng.standard_normal(len(window.window_vars))
+        x[window.window_vars] += noise
+        print(f"perturbed {len(window.window_vars):,} window variables, relative scale {perturb:g}")
 
-    residual_full = np.empty(system.n_eq)
-    system.residuals(x, residual_full)
-    norm = np.abs(residual_full[eq_sel]).max()
-    print(f"start: ||r||_inf = {norm:.3e}")
+    norm, _ = solve_window(system, window, x, tol=tol, max_iter=max_iter)
 
-    for iteration in range(1, max_iter + 1):
-        t0 = time.time()
-        jac = system.jacobian_csc(x)                     # full free-column jacobian
-        jac_window = jac[eq_perm, :][:, var_perm].tocsc()
-        t1 = time.time()
-        print(f"  iter {iteration}: jacobian {t1 - t0:.1f}s, window nnz {jac_window.nnz:,}", flush=True)
-        rhs = -residual_full[eq_perm]
-        if direct:
-            from scipy.sparse.linalg import splu
-            lu = splu(jac_window)
-            dx = lu.solve(rhs)
-            dx += lu.solve(rhs - jac_window @ dx)  # one step of iterative refinement
-            gmres_iters = 0
-        else:
-            dx, info, gmres_iters = solve_linear(jac_window, rhs, year_offsets,
-                                                 exact_blocks=exact_blocks)
-            if info != 0:
-                print(f"  WARNING: lgmres info={info} after {gmres_iters} iterations")
-        t2 = time.time()
-
-        alpha = 1.0
-        for _ in range(8):
-            x_try = x.copy()
-            x_try[window_vars_sorted] += alpha * dx
-            system.residuals(x_try, residual_full)
-            trial_norm = np.abs(residual_full[eq_sel]).max()
-            if np.isfinite(trial_norm) and trial_norm < norm:
-                break
-            alpha *= 0.5
-        else:
-            print("  line search failed to reduce ||r||; stopping")
-            break
-
-        x = x_try
-        norm = trial_norm
-        solver_note = "splu" if direct else f"lgmres/{gmres_iters}"
-        print(f"iter {iteration}: ||r||_inf = {norm:.3e}  ||dx||_inf = {np.abs(dx).max():.3e}  "
-              f"alpha = {alpha}  (jac {t1 - t0:.1f}s, {solver_note} {t2 - t1:.1f}s)", flush=True)
-        if norm < tol:
-            break
-
-    recovery = np.abs(x[window_vars] - system.levels[window_vars])
-    denom = np.abs(system.levels[window_vars]) + 1e-8
+    recovery = np.abs(x[window.window_vars] - system.levels[window.window_vars])
+    denom = np.abs(system.levels[window.window_vars]) + 1e-8
     print(f"final ||r||_inf = {norm:.3e}")
     print(f"recovery vs original solution: max rel dev = {(recovery / denom).max():.3e}, "
           f"median = {np.median(recovery / denom):.3e}")
+
+
+def find_variable(convert_dir: Path, name: str) -> int:
+    """Exact dict.txt variable name (e.g. 'jvBNI(2124)') -> 0-based x index."""
+    with (convert_dir / "dict.txt").open(encoding="utf-8") as handle:
+        in_vars = False
+        for line in handle:
+            if line.startswith("Variables "):
+                in_vars = True
+                continue
+            if not in_vars:
+                continue
+            parts = line.split()
+            if len(parts) >= 2 and parts[1] == name:
+                return int(parts[0][1:]) - 1
+    raise SystemExit(f"variable {name!r} not found in dict.txt")
+
+
+def iter_equation_statements(gams_path: Path):
+    """Yield (eq_index_0based, full_statement_text) for every equation in gams.gms."""
+    statement: list[str] = []
+    eq_index = -1
+    in_equations = False
+    with gams_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not in_equations:
+                if EQ_START_RE.match(line):
+                    in_equations = True
+                else:
+                    continue
+            if line[0] == "*":
+                continue
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if not statement:
+                match = EQ_START_RE.match(stripped)
+                if not match:
+                    return  # equations section over
+                eq_index = int(match.group(1)) - 1
+            statement.append(stripped)
+            if stripped.endswith(";"):
+                # join on spaces: a wrapped line may start with '*' (multiplication),
+                # which GAMS would treat as a comment in column 1
+                yield eq_index, " ".join(statement)
+                statement = []
+
+
+def wrap_names(names: list[str], width: int = 200) -> str:
+    lines: list[str] = []
+    current = "    "
+    for name in names:
+        if len(current) + len(name) + 1 > width and current.strip():
+            lines.append(current)
+            current = "    "
+        current += name + ","
+    lines.append(current)
+    return "\n".join(lines).rstrip(",")
+
+
+def export_window_gms(system: System, window: Window, convert_dir: Path, x: np.ndarray,
+                      out_path: Path) -> np.ndarray:
+    """Write a runnable GAMS scalar model for the window at point x (shocks already applied).
+
+    Equations are copied verbatim from the original convert file; out-of-window and
+    exogenous variables are fixed at their values in x. Returns the referenced var ids.
+    """
+    eq_mask = window.in_window_eq_mask(system.n_eq)
+    entry_counts = np.diff(system.entry_offsets)
+    entry_mask = np.repeat(eq_mask, entry_counts)
+    var_stream = system.args[np.asarray(system.code) == OP_VAR]
+    referenced = np.unique(var_stream[entry_mask])
+    free_mask = np.zeros(len(system.levels), dtype=bool)
+    free_mask[window.window_vars] = True
+
+    with out_path.open("w", encoding="utf-8") as out:
+        out.write("$offlisting\n$offsymxref\noption limrow=0, limcol=0, solprint=off;\n")
+        out.write("Variables zobj,\n")
+        out.write(wrap_names([f"x{v + 1}" for v in referenced]))
+        out.write(";\n\nEquations eobj,\n")
+        out.write(wrap_names([f"e{e + 1}" for e in window.eq_sel]))
+        out.write(";\n\neobj.. zobj =E= 0;\n")
+        for eq_index, statement in iter_equation_statements(convert_dir / "gams.gms"):
+            if eq_mask[eq_index]:
+                out.write(statement)
+                out.write("\n")
+        out.write("\n* levels for window unknowns, fixes for everything else\n")
+        for v in referenced:
+            suffix = "l" if free_mask[v] else "fx"
+            out.write(f"x{v + 1}.{suffix} = {float(x[v])!r};\n")
+        out.write("\nModel mw /all/;\nmw.holdfixed = 1;\noption nlp=ipopt;\n")
+        out.write("Solve mw using NLP minimizing zobj;\n")
+        out.write("execute_unload 'oracle_out.gdx';\n")
+    return referenced
+
+
+def run_gams(workdir: Path, gms_name: str) -> None:
+    import subprocess
+
+    gams_binary = Path(__file__).parent / ".venv/lib/python3.12/site-packages/gamspy_base/gams"
+    license_path = Path.home() / "Library/Application Support/GAMSPy/gamspy_license.txt"
+    result = subprocess.run(
+        [str(gams_binary), gms_name, f"license={license_path}", "lo=2"],
+        cwd=workdir, capture_output=True, text=True,
+    )
+    log = (workdir / gms_name.replace(".gms", ".log"))
+    if result.returncode != 0:
+        tail = log.read_text(encoding="utf-8")[-2000:] if log.exists() else result.stdout[-2000:]
+        raise SystemExit(f"gams exited {result.returncode}:\n{tail}")
+    lst = workdir / gms_name.replace(".gms", ".lst")
+    if lst.exists():
+        statuses = [line.strip() for line in lst.read_text(encoding="utf-8").splitlines()
+                    if "SOLVER STATUS" in line or "MODEL STATUS" in line or "Iteration count" in line]
+        for line in statuses[:4]:
+            print(f"  {line}")
+
+
+def read_oracle_solution(workdir: Path, referenced: np.ndarray, n_vars: int) -> np.ndarray:
+    """Parse xN levels from gdxdump of the oracle GDX into a full-length array."""
+    import subprocess
+
+    gdxdump = Path(__file__).parent / ".venv/lib/python3.12/site-packages/gamspy_base/gdxdump"
+    text = subprocess.run([str(gdxdump), "oracle_out.gdx"], cwd=workdir,
+                          capture_output=True, text=True, check=True).stdout
+    values = np.full(n_vars, np.nan)
+    # gdxdump: "free     Variable x103 /L 1, LO 1, UP 1 /;" — the L field is OMITTED when 0
+    pattern = re.compile(r"Variable x(\d+)\s*/([^/;]*)/")
+    level_re = re.compile(r"\bL\s+([^,\s/]+)")
+    special = {"Eps": 0.0, "+Inf": np.inf, "-Inf": -np.inf, "Na": np.nan, "Undf": np.nan}
+    count = 0
+    for match in pattern.finditer(text):
+        fields = level_re.search(match.group(2))
+        token = fields.group(1) if fields else "0"
+        values[int(match.group(1)) - 1] = special.get(token, None) if token in special else float(token)
+        count += 1
+    print(f"  oracle solution: parsed {count:,} variable levels from gdxdump")
+    return values
+
+
+def cmd_oracle(from_year: int, shock_name: str, shock_factor: float, shock_delta: float,
+               convert_dir: Path, tol: float, max_iter: int, reuse_gams: bool = False) -> None:
+    """Solve the same shocked window with GAMS/IPOPT and with the free Newton solver; compare."""
+    system = System()
+    window = Window(system, convert_dir, from_year)
+    print(f"window: {len(window.eq_sel):,} equations ({window.n_years} years)")
+
+    shock_var = find_variable(convert_dir, shock_name)
+    if not system.is_fixed[shock_var]:
+        raise SystemExit(f"{shock_name} is endogenous (free) — shock an exogenous variable")
+    old_value = system.levels[shock_var]
+    new_value = old_value * shock_factor + shock_delta
+    print(f"shock: {shock_name} (x{shock_var + 1}) {old_value!r} -> {new_value!r}")
+
+    x = system.levels.copy()
+    x[shock_var] = new_value
+
+    workdir = CACHE_DIR / "oracle"
+    workdir.mkdir(parents=True, exist_ok=True)
+    if reuse_gams and (workdir / "oracle_out.gdx").exists():
+        print("reusing existing oracle_out.gdx", flush=True)
+        referenced = np.array([], dtype=np.int64)
+    else:
+        print("exporting window model for GAMS ...", flush=True)
+        referenced = export_window_gms(system, window, convert_dir, x, workdir / "window.gms")
+        if shock_var not in set(referenced.tolist()):
+            print("  WARNING: shock variable is not referenced by any window equation!")
+        print(f"  wrote window.gms ({len(referenced):,} variables referenced)")
+        print("running GAMS + IPOPT ...", flush=True)
+        t0 = time.time()
+        run_gams(workdir, "window.gms")
+        print(f"  gams finished in {time.time() - t0:.0f}s")
+    oracle = read_oracle_solution(workdir, referenced, len(system.levels))
+
+    print("running free Newton solver on the same shocked window ...", flush=True)
+    ours = system.levels.copy()
+    solve_shock(system, window, ours, shock_var, new_value, tol=tol)
+    final_residual = np.empty(system.n_eq)
+    system.residuals(ours, final_residual)
+    print(f"free solver final ||r||_inf = {np.abs(final_residual[window.eq_sel]).max():.3e}")
+
+    w = window.window_vars
+    have = np.isfinite(oracle[w])
+    deviation = np.abs(ours[w][have] - oracle[w][have])
+    scale = np.maximum(np.abs(oracle[w][have]), 1e-6)
+    rel = deviation / scale
+    moved = np.abs(oracle[w][have] - system.levels[w][have]) / scale
+    print("\n=== ORACLE COMPARISON (free Newton vs GAMS/IPOPT, same shocked system) ===")
+    print(f"variables compared: {have.sum():,}")
+    print(f"shock actually moved the solution: max |change| rel = {moved.max():.3e}, "
+          f"p90 = {np.percentile(moved, 90):.3e}")
+    print(f"solver disagreement: max rel = {rel.max():.3e}, median rel = {np.median(rel):.3e}, "
+          f"p99.9 rel = {np.percentile(rel, 99.9):.3e}")
+    responded = moved > 1e-6  # clear of both solvers' tolerance floor
+    if responded.any():
+        irf_err = deviation[responded] / (moved[responded] * scale[responded])
+        print(f"variables that responded to the shock (rel change > 1e-8): {responded.sum():,}")
+        print(f"  disagreement relative to response size: max = {irf_err.max():.3e}, "
+              f"median = {np.median(irf_err):.3e}")
 
 
 def equation_names(convert_dir: Path, wanted: set[int]) -> dict[int, str]:
@@ -944,7 +1211,12 @@ def cmd_check(convert_dir: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command",
-                        choices=["parse", "check", "jacobian", "newton", "lutest", "_lu_child", "structure"])
+                        choices=["parse", "check", "jacobian", "newton", "lutest", "_lu_child",
+                                 "structure", "oracle"])
+    parser.add_argument("--shock-name", default="", help="dict.txt variable name, e.g. 'jvBNI(2124)'")
+    parser.add_argument("--shock-factor", type=float, default=1.0)
+    parser.add_argument("--shock-delta", type=float, default=0.0)
+    parser.add_argument("--reuse-gams", action="store_true")
     parser.add_argument("--convert-dir", type=Path, default=DEFAULT_CONVERT_DIR)
     parser.add_argument("--perturb", type=float, default=1e-4)
     parser.add_argument("--max-iter", type=int, default=8)
@@ -965,6 +1237,9 @@ def main() -> None:
         cmd_lu_child(parsed.lu_method)
     elif parsed.command == "structure":
         cmd_structure(parsed.convert_dir)
+    elif parsed.command == "oracle":
+        cmd_oracle(parsed.from_year, parsed.shock_name, parsed.shock_factor, parsed.shock_delta,
+                   parsed.convert_dir, parsed.tol, parsed.max_iter, parsed.reuse_gams)
     else:
         cmd_newton(parsed.perturb, parsed.max_iter, parsed.tol, parsed.from_year, parsed.convert_dir)
 
