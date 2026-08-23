@@ -52,6 +52,38 @@ wheels = [
 ]
 
 [[package]]
+name = "kvxopt"
+version = "1.3.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/94/0d/0e8b1c6c60894bc703ceeb4db759bdfa35d65c9cd0d751495484fdbc09c8/kvxopt-1.3.3.1.tar.gz", hash = "sha256:0b436b215549bd6a38b2db023eec1a3d61227bae97fb60b7ee4188c6e0fa47cb", size = 10386301, upload-time = "2026-02-22T22:28:25.652Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/0c/ac61aa20424662e6561bf8abb7790f9b236e23de89c6cf372cfecef2ffe6/kvxopt-1.3.3.1-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:21f30d10ee2fa510f69182e2a5ab1dbf7e0c5cf3a84abeb3e00b380f395bb4db", size = 12668976, upload-time = "2026-02-22T22:27:21.408Z" },
+    { url = "https://files.pythonhosted.org/packages/24/6b/ba99bfb309d5b9011cbc03a16e415a1d28c70ae3d61eb1adb8d59823e089/kvxopt-1.3.3.1-cp312-cp312-macosx_15_0_arm64.whl", hash = "sha256:768c85ddf4890bc6293c28dddb9b2eba97e0758b269803fc94aa46a2c01306ec", size = 12708583, upload-time = "2026-02-22T22:27:23.939Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/15/142fa9b16e2150dc7b2f7e7c8052b8c53b7a44d47213d333246c48046b89/kvxopt-1.3.3.1-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:9879419ba4279befa955e9adc93179ea8952084c85628fecc1050c0f5e6b476e", size = 13909621, upload-time = "2026-02-22T22:27:26.28Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/53/e287f4b650bfac129b487455ec2704a41bbceba2a89a1193fdb11f005a38/kvxopt-1.3.3.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:e08734072b2cdcb9dafd0691334e1b844631ffee3b7a308dd5b02e4212fb6abf", size = 21341732, upload-time = "2026-02-22T22:27:28.279Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/b1/426c2747106e95dcf3c8795c7ac791ed5f86148c0a89b435cd2a0d7affb7/kvxopt-1.3.3.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:e22707ca6e36f106de7426570456154a10d361ef009ed3df139ffcd74014eba8", size = 10017702, upload-time = "2026-02-22T22:27:30.631Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/2e/89731c1d9d495e00e97c24989839bd31fc4d6bc90ec553cc5b1d5366dbc0/kvxopt-1.3.3.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:950ab6e3867e1ed0bd10d5a134f3ef3c1bcfbd8543d9f142a36334587ef0b1f0", size = 16986427, upload-time = "2026-02-22T22:27:32.967Z" },
+    { url = "https://files.pythonhosted.org/packages/93/72/94f0777edb32c51031f46ac352e2354658bbf6e6983bce36505f55ce09ac/kvxopt-1.3.3.1-cp312-cp312-win_amd64.whl", hash = "sha256:821cdb4ea62b90c3d84cbadc4108104bdae809b5e140ba3a2a6626d6ecafcdfb", size = 17314754, upload-time = "2026-02-22T22:27:35.223Z" },
+    { url = "https://files.pythonhosted.org/packages/47/ec/a36b514a2a708141e452489e754ed90da5dd495ac6525492f1b3bb3591d5/kvxopt-1.3.3.1-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:06a390edd8b28a8c4b80820cce5a099c44a8fca5aa28646e18730e5377ffa3f5", size = 12669004, upload-time = "2026-02-22T22:27:37.98Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/91/1ba0be54e34c2f4cef1f1fab30ec615a481f0ae9f514601b2e139c29f3c7/kvxopt-1.3.3.1-cp313-cp313-macosx_15_0_arm64.whl", hash = "sha256:2c12292800b3172894ad45b8ec14b006e93c1f3a928112d062e7ede7c6be79db", size = 12708587, upload-time = "2026-02-22T22:27:40.228Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/a8/d16f54d96b92f21a41e92b329ab72da8f7999dcc9eb29219ac3271ac0569/kvxopt-1.3.3.1-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:479775b79697ef966cc6bc1eaf7739665e2b236402af0405b2ffd9fb30ad4d77", size = 13910733, upload-time = "2026-02-22T22:27:42.473Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/79/4b8e765bee0aab59a65111d65a35723ec5b64241690a39e736d9df9f124e/kvxopt-1.3.3.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:e873bf3ba6d7163413db516f4006d594fafb870a3da10e1346bd7525068ebc98", size = 21342572, upload-time = "2026-02-22T22:27:44.483Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/2a/5e6cd21b21e1a2ae1e7f2d8db47d1ba0cbdb0b03e963b0ea959286b66523/kvxopt-1.3.3.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:223be91a912614115f30f7f21d284068cfb2e3d88c0eccad5f9130bbc492ff0e", size = 10018661, upload-time = "2026-02-22T22:27:46.512Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/12/08418fe88319b894e9d87f3db7dc95917982a1c203144327c3b8957ff346/kvxopt-1.3.3.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:bb1490292a7f87804f6514f0bd9dc2d2448782f4c6e0c7e958d07948b47374c4", size = 16987451, upload-time = "2026-02-22T22:27:48.48Z" },
+    { url = "https://files.pythonhosted.org/packages/1a/fe/bcafd673ea33a7bd47ffc820f1f4563126853243e587d8086475212cf067/kvxopt-1.3.3.1-cp313-cp313-win_amd64.whl", hash = "sha256:c386d6414c6892e15ca0cdca832d639f176c697befc2a83d8b88a2e957919888", size = 17314793, upload-time = "2026-02-22T22:27:50.978Z" },
+    { url = "https://files.pythonhosted.org/packages/43/47/c2063faa8e300560d868e167da2a106cb4f0e281373a74acc36492298eae/kvxopt-1.3.3.1-cp314-cp314-macosx_14_0_arm64.whl", hash = "sha256:a8467b4bcfa80fbd4c6dcc1138984ddfb629e88cc189f76b0eb75f0768f3136c", size = 12669998, upload-time = "2026-02-22T22:27:54.032Z" },
+    { url = "https://files.pythonhosted.org/packages/59/76/ea5980ddda5361d42f8443d4d9c9a69524c08150368533785f31ddea1eb2/kvxopt-1.3.3.1-cp314-cp314-macosx_15_0_arm64.whl", hash = "sha256:386008cafc9517a6aa973526e0507ef70d1f558b79b961d130f44ebaab555be5", size = 12709403, upload-time = "2026-02-22T22:27:56.304Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/70/efe8c10a23f2598e14d104bbcdd296eb1b50ad74493cd511e6d9fb31f9aa/kvxopt-1.3.3.1-cp314-cp314-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:40469758d9b630c5057282636d4f59e61cfef6a9eae339c2424d1e3deb1607d4", size = 13911511, upload-time = "2026-02-22T22:27:58.559Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/90/3093ac35dbf8911b6b2fc14b3ee06a98186cd8a9fe61b48d916706c1b109/kvxopt-1.3.3.1-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:682136d7061120800feec9ab3a9e1f2127187eecd008ef12c92124f72f94d6cc", size = 21342921, upload-time = "2026-02-22T22:28:00.67Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/b7/9713a73c1d141395beac5653399c12967b90e54ab95974ab4acffc164e11/kvxopt-1.3.3.1-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:e7a94b6f80c383a957094cab9ac0f5800bc9ade3d63968f3f877e17b94f0b90b", size = 10018845, upload-time = "2026-02-22T22:28:02.695Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/1b/197c9ed2ed44bb257030d9a6591e5e1efb85bd851efd555e1c7619723f85/kvxopt-1.3.3.1-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:fe07d71830301f3206dccc0e83bb316ca4dc61ac5fbdf38d6a020ed3116f3d47", size = 16987734, upload-time = "2026-02-22T22:28:05.023Z" },
+    { url = "https://files.pythonhosted.org/packages/45/e8/f9d03c143c03066872c7d422f4fde216126f564800fcd933b6971ed68fe3/kvxopt-1.3.3.1-cp314-cp314-win_amd64.whl", hash = "sha256:8603a084d25c4667c3a2abc277761c66dd0ff4643967e911c840686c3b9490f9", size = 17583477, upload-time = "2026-02-22T22:28:07.284Z" },
+]
+
+[[package]]
 name = "llvmlite"
 version = "0.49.0"
 source = { registry = "https://pypi.org/simple" }
@@ -83,6 +115,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "gamsapi", extra = ["transfer"] },
     { name = "gamspy-base" },
+    { name = "kvxopt" },
     { name = "numba" },
     { name = "pandas" },
     { name = "pyarrow" },
@@ -92,6 +125,7 @@ dependencies = [
 requires-dist = [
     { name = "gamsapi", extras = ["transfer"], specifier = ">=54.3.1" },
     { name = "gamspy-base", specifier = ">=54.3.1" },
+    { name = "kvxopt", specifier = ">=1.3.3.1" },
     { name = "numba", specifier = ">=0.67.0" },
     { name = "pandas", specifier = ">=3.0.5" },
     { name = "pyarrow", specifier = ">=25.0.1" },
