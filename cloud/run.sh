@@ -25,7 +25,7 @@ echo "=============================================================="
 uv run python freesolver.py solve-export \
   --from-year 2029 \
   --shock-name rRenteECB --shock-years 2030-2129 --shock-delta 0.01 \
-  --out shock_gdx/Rente_perm.gdx
+  --out shock_gdx/Rente_ufin.gdx
 
 echo "=============================================================="
 echo "STEP 4  Second scenario: Brent oil price +10 pct. from 2030, permanent"
@@ -33,7 +33,7 @@ echo "=============================================================="
 uv run python freesolver.py solve-export \
   --from-year 2029 \
   --shock-name pOlieBrent --shock-years 2030-2129 --shock-factor 1.10 \
-  --out shock_gdx/Oliepris_perm.gdx
+  --out shock_gdx/Oliepris_ufin.gdx
 
 echo "=============================================================="
 echo "DONE — copy etl/shock_gdx/*.gdx back to the laptop and run:"

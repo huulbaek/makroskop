@@ -944,10 +944,16 @@ def solve_window(system: System, window: Window, x: np.ndarray,
         if lu is None:
             jac = system.jacobian_csc(x)
             jac_window = jac[window.eq_perm, :][:, window.var_perm].tocsc()
-            lu = make_direct_solver(jac_window)
+            lu = (make_direct_solver(jac_window), jac_window)
             fresh = True
         factor_time = time.time() - t0
-        dx = lu(-residual_full[window.eq_perm])
+        solve_fn, matrix = lu
+        rhs = -residual_full[window.eq_perm]
+        dx = solve_fn(rhs)
+        # iterative refinement: Pardiso's default accuracy (~1e-6) is far too loose
+        # for Newton to reach 1e-9 residuals; two passes reach ~1e-12 on any backend
+        for _ in range(2):
+            dx += solve_fn(rhs - matrix @ dx)
 
         # Non-monotone acceptance: a full Newton step may raise ||r||_inf temporarily
         # (bilinear cross-terms of large-scale NPV variables) yet be nearly exact in
