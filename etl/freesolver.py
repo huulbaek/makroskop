@@ -879,12 +879,16 @@ def solve_linear(jac_sorted, rhs: np.ndarray, year_offsets: np.ndarray,
 
 
 def make_direct_solver(matrix):
-    """Factorize once, return a solve callable. Prefers MKL Pardiso (x86) over SuperLU.
+    """Factorize once, return a verified solve callable.
 
-    Rows are equilibrated first: this system mixes ~1e5-scale NPV rows with
-    ~1e-2-scale ratio rows, which wrecks pivot quality (observed as sporadic
-    Pardiso factorizations too inaccurate for Newton's final digits).
+    Backend chain (override order with FREESOLVER_BACKEND=umfpack,superlu,...):
+    Pardiso is fastest but its static pivoting sporadically produces garbage
+    factorizations on this ill-conditioned system (observed refinement residuals
+    up to 1e33); every factorization is therefore verified with a probe solve
+    and rejected backends fall through to UMFPACK, then SuperLU (never observed
+    to fail). Rows are equilibrated first (row scales span ~1e-2..1e5).
     """
+    import os
     from scipy import sparse
 
     csr = matrix.tocsr()
@@ -893,17 +897,47 @@ def make_direct_solver(matrix):
     row_max = magnitude.max(axis=1).toarray().ravel()
     scale = np.where(row_max > 0, 1.0 / np.maximum(row_max, 1e-300), 1.0)
     scaled = (sparse.diags(scale) @ csr).tocsr()
-    try:
-        import pypardiso
+    n = csr.shape[0]
 
-        solver = pypardiso.PyPardisoSolver()
-        solver.factorize(scaled)
-        return lambda b: solver.solve(scaled, scale * b)
-    except ImportError:
+    def build(backend: str):
+        if backend == "pardiso":
+            import pypardiso
+            solver = pypardiso.PyPardisoSolver()
+            solver.factorize(scaled)
+            return lambda b: solver.solve(scaled, scale * b)
+        if backend == "umfpack":
+            from kvxopt import matrix as kmatrix, spmatrix, umfpack
+            coo = scaled.tocoo()
+            a = spmatrix(coo.data, coo.row.astype(np.int64), coo.col.astype(np.int64), (n, n))
+            numeric = umfpack.numeric(a, umfpack.symbolic(a))
+
+            def solve(b):
+                rhs = kmatrix(scale * b)
+                umfpack.solve(a, numeric, rhs)
+                return np.asarray(rhs).ravel()
+
+            return solve
         from scipy.sparse.linalg import splu
-
         lu = splu(scaled.tocsc())
         return lambda b: lu.solve(scale * b)
+
+    probe_rhs = csr @ np.random.default_rng(3).standard_normal(n)
+    probe_norm = np.linalg.norm(probe_rhs) + 1e-300
+    order = os.environ.get("FREESOLVER_BACKEND", "pardiso,umfpack,superlu").split(",")
+    last = None
+    for backend in order:
+        try:
+            solve_fn = build(backend.strip())
+        except ImportError:
+            continue
+        last = solve_fn
+        rel = np.linalg.norm(csr @ solve_fn(probe_rhs) - probe_rhs) / probe_norm
+        if rel < 1e-8:
+            return solve_fn
+        print(f"  {backend}: factorization rejected (probe rel residual {rel:.1e}), "
+              f"falling back", flush=True)
+    print("  WARNING: no backend passed verification; using last available", flush=True)
+    return last
 
 
 class Window:
