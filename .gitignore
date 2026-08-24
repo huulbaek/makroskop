@@ -16,3 +16,6 @@ app/build/
 
 # freesolver parse cache (regenerate with: uv run python freesolver.py parse)
 etl/cache/
+
+# cloud bundle
+makroskop-cloud.tar.gz

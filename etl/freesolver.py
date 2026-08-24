@@ -491,6 +491,78 @@ def swap_used_gb() -> float:
     return float(used) / 1024
 
 
+def export_solution_gdx(convert_dir: Path, x: np.ndarray, out_path: Path) -> None:
+    """Write a solved point as a baseline.gdx-style GDX (symbol names + domains from dict.txt).
+
+    The last domain column is named 't' when it holds years, matching what the
+    MAKROskop ETL (extract.py read_records) expects.
+    """
+    import pandas as pd
+    import gams.transfer as gt
+    import gamspy_base
+    from collections import defaultdict
+
+    records: dict[str, list] = defaultdict(list)
+    with (convert_dir / "dict.txt").open(encoding="utf-8") as handle:
+        in_vars = False
+        for line in handle:
+            if line.startswith("Variables "):
+                in_vars = True
+                continue
+            if not in_vars:
+                continue
+            parts = line.split()
+            if len(parts) < 2 or parts[0][0] != "x" or not parts[0][1:].isdigit():
+                continue
+            symbol, _, rest = parts[1].partition("(")
+            keys = rest.rstrip(")").split(",") if rest else []
+            records[symbol].append((keys, x[int(parts[0][1:]) - 1]))
+
+    container = gt.Container(system_directory=gamspy_base.directory)
+    written = 0
+    for symbol, entries in records.items():
+        ndim = len(entries[0][0])
+        columns = [f"d{i}" for i in range(ndim)]
+        if ndim and all(entry[0][-1].isdigit() for entry in entries[:50]):
+            columns[-1] = "t"
+        frame = pd.DataFrame(
+            [(*keys, value) for keys, value in entries],
+            columns=columns + ["level"],
+        )
+        frame["marginal"] = 0.0
+        frame["lower"] = -np.inf
+        frame["upper"] = np.inf
+        frame["scale"] = 1.0
+        gt.Variable(container, symbol, "free", domain=columns or None, records=frame)
+        written += 1
+    container.write(str(out_path))
+    print(f"wrote {out_path} ({written:,} symbols, {sum(len(v) for v in records.values()):,} records)")
+
+
+def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, int] | None,
+                     shock_factor: float, shock_delta: float, out_path: Path,
+                     convert_dir: Path, tol: float) -> None:
+    """Solve a (possibly multi-year) shock with continuation and export the solution as GDX."""
+    system = System()
+    window = Window(system, convert_dir, from_year)
+    print(f"window: {len(window.eq_sel):,} equations ({window.n_years} years)")
+
+    shock_vars = np.array(find_shock_variables(convert_dir, shock_name, shock_years))
+    fixed_ok = system.is_fixed[shock_vars]
+    if not fixed_ok.all():
+        raise SystemExit(f"{(~fixed_ok).sum()} of {len(shock_vars)} shock variables are endogenous")
+    targets = system.levels[shock_vars] * shock_factor + shock_delta
+    print(f"shock: {shock_name} x {len(shock_vars)} instances "
+          f"(years {shock_years}), factor {shock_factor}, delta {shock_delta}")
+
+    x = system.levels.copy()
+    solve_shock(system, window, x, shock_vars, targets, tol=tol)
+    residual = np.empty(system.n_eq)
+    system.residuals(x, residual)
+    print(f"solved: ||r||_inf = {np.abs(residual[window.eq_sel]).max():.3e}")
+    export_solution_gdx(convert_dir, x, out_path)
+
+
 def cmd_lutest(methods: tuple[str, ...], convert_dir: Path, from_year: int = 2022) -> None:
     """Factorize the year-sorted Jacobian with each candidate in a killable subprocess.
 
@@ -806,6 +878,22 @@ def solve_linear(jac_sorted, rhs: np.ndarray, year_offsets: np.ndarray,
     return solution, info, iterations[0]
 
 
+def make_direct_solver(matrix):
+    """Factorize once, return a solve callable. Prefers MKL Pardiso (x86) over SuperLU."""
+    try:
+        import pypardiso
+
+        solver = pypardiso.PyPardisoSolver()
+        csr = matrix.tocsr()
+        solver.factorize(csr)
+        return lambda b: solver.solve(csr, b)
+    except ImportError:
+        from scipy.sparse.linalg import splu
+
+        lu = splu(matrix)
+        return lu.solve
+
+
 class Window:
     """A trailing time-window of the system: equations/free vars with year >= from_year."""
 
@@ -835,14 +923,12 @@ class Window:
 
 def solve_window(system: System, window: Window, x: np.ndarray,
                  tol: float = 1e-9, max_iter: int = 10, lu_reuse=None):
-    """Newton on the window, mutating x in place. Returns (final ||r||_inf, last LU).
+    """Newton on the window, mutating x in place. Returns (final ||r||_inf, last solver).
 
-    A carried-over LU (chord iterations) is tried first and rebuilt from a fresh
-    Jacobian whenever progress is poor — cheap on continuation ladders where the
+    A carried-over factorization (chord iterations) is tried first and rebuilt from a
+    fresh Jacobian whenever progress is poor — cheap on continuation ladders where the
     Jacobian barely changes between stages.
     """
-    from scipy.sparse.linalg import splu
-
     residual_full = np.empty(system.n_eq)
     system.residuals(x, residual_full)
     norm = np.abs(residual_full[window.eq_sel]).max()
@@ -858,10 +944,10 @@ def solve_window(system: System, window: Window, x: np.ndarray,
         if lu is None:
             jac = system.jacobian_csc(x)
             jac_window = jac[window.eq_perm, :][:, window.var_perm].tocsc()
-            lu = splu(jac_window)
+            lu = make_direct_solver(jac_window)
             fresh = True
         factor_time = time.time() - t0
-        dx = lu.solve(-residual_full[window.eq_perm])
+        dx = lu(-residual_full[window.eq_perm])
 
         # Non-monotone acceptance: a full Newton step may raise ||r||_inf temporarily
         # (bilinear cross-terms of large-scale NPV variables) yet be nearly exact in
@@ -900,14 +986,14 @@ def solve_window(system: System, window: Window, x: np.ndarray,
     return norm, lu
 
 
-def solve_shock(system: System, window: Window, x: np.ndarray, shock_var: int,
-                target_value: float, tol: float = 1e-9) -> float:
-    """Continuation on shock size: ramp the exogenous variable to its target.
+def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.ndarray,
+                target_values: np.ndarray, tol: float = 1e-9) -> float:
+    """Continuation on shock size: ramp the exogenous variables to their targets.
 
     Mirrors MAKRO's own homotopy trick (solve at 1/100 size, then rescale).
     """
-    base_value = float(x[shock_var])
-    delta = target_value - base_value
+    base_values = x[shock_vars].copy()
+    deltas = target_values - base_values
     solved_share = 0.0
     step = 0.01
     checkpoint = x.copy()
@@ -920,7 +1006,7 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_var: int,
             raise SystemExit("continuation gave up after 40 stages")
         share = min(1.0, solved_share + step)
         x[:] = checkpoint
-        x[shock_var] = base_value + share * delta
+        x[shock_vars] = base_values + share * deltas
         print(f"--- continuation: {solved_share:.4f} -> {share:.4f} of shock ---", flush=True)
         norm, lu = solve_window(system, window, x, tol=tol, max_iter=5, lu_reuse=lu)
         if norm < tol:
@@ -955,6 +1041,37 @@ def cmd_newton(perturb: float, max_iter: int, tol: float, from_year: int, conver
     print(f"final ||r||_inf = {norm:.3e}")
     print(f"recovery vs original solution: max rel dev = {(recovery / denom).max():.3e}, "
           f"median = {np.median(recovery / denom):.3e}")
+
+
+def find_shock_variables(convert_dir: Path, name: str, years: tuple[int, int] | None) -> list[int]:
+    """Variable ids for a shock spec.
+
+    'rRenteECB(2124)' -> that exact instance; 'rRenteECB' + years -> every instance
+    (all domain combinations) whose final index falls in the year range.
+    """
+    if "(" in name:
+        return [find_variable(convert_dir, name)]
+    prefix = name + "("
+    ids: list[int] = []
+    with (convert_dir / "dict.txt").open(encoding="utf-8") as handle:
+        in_vars = False
+        for line in handle:
+            if line.startswith("Variables "):
+                in_vars = True
+                continue
+            if not in_vars:
+                continue
+            parts = line.split()
+            if len(parts) < 2 or not parts[1].startswith(prefix):
+                continue
+            last_key = parts[1].rstrip(")").rsplit(",", 1)[-1].rsplit("(", 1)[-1]
+            if not last_key.isdigit():
+                continue
+            if years is None or years[0] <= int(last_key) <= years[1]:
+                ids.append(int(parts[0][1:]) - 1)
+    if not ids:
+        raise SystemExit(f"no variables matched shock spec {name!r} in years {years}")
+    return ids
 
 
 def find_variable(convert_dir: Path, name: str) -> int:
@@ -1130,7 +1247,7 @@ def cmd_oracle(from_year: int, shock_name: str, shock_factor: float, shock_delta
 
     print("running free Newton solver on the same shocked window ...", flush=True)
     ours = system.levels.copy()
-    solve_shock(system, window, ours, shock_var, new_value, tol=tol)
+    solve_shock(system, window, ours, np.array([shock_var]), np.array([new_value]), tol=tol)
     final_residual = np.empty(system.n_eq)
     system.residuals(ours, final_residual)
     print(f"free solver final ||r||_inf = {np.abs(final_residual[window.eq_sel]).max():.3e}")
@@ -1212,10 +1329,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command",
                         choices=["parse", "check", "jacobian", "newton", "lutest", "_lu_child",
-                                 "structure", "oracle"])
-    parser.add_argument("--shock-name", default="", help="dict.txt variable name, e.g. 'jvBNI(2124)'")
+                                 "structure", "oracle", "solve-export", "export-baseline"])
+    parser.add_argument("--shock-name", default="",
+                        help="exact instance 'rRenteECB(2124)' or symbol 'rRenteECB' with --shock-years")
+    parser.add_argument("--shock-years", default="",
+                        help="year range for symbol-level shocks, e.g. '2030-2129'")
     parser.add_argument("--shock-factor", type=float, default=1.0)
     parser.add_argument("--shock-delta", type=float, default=0.0)
+    parser.add_argument("--out", type=Path, default=Path(__file__).parent / "shock_gdx" / "solved.gdx")
     parser.add_argument("--reuse-gams", action="store_true")
     parser.add_argument("--convert-dir", type=Path, default=DEFAULT_CONVERT_DIR)
     parser.add_argument("--perturb", type=float, default=1e-4)
@@ -1240,6 +1361,16 @@ def main() -> None:
     elif parsed.command == "oracle":
         cmd_oracle(parsed.from_year, parsed.shock_name, parsed.shock_factor, parsed.shock_delta,
                    parsed.convert_dir, parsed.tol, parsed.max_iter, parsed.reuse_gams)
+    elif parsed.command == "export-baseline":
+        data = np.load(CACHE_DIR / "system.npz")
+        export_solution_gdx(parsed.convert_dir, data["levels"], parsed.out)
+    elif parsed.command == "solve-export":
+        years = None
+        if parsed.shock_years:
+            lo, _, hi = parsed.shock_years.partition("-")
+            years = (int(lo), int(hi or lo))
+        cmd_solve_export(parsed.from_year, parsed.shock_name, years, parsed.shock_factor,
+                         parsed.shock_delta, parsed.out, parsed.convert_dir, parsed.tol)
     else:
         cmd_newton(parsed.perturb, parsed.max_iter, parsed.tol, parsed.from_year, parsed.convert_dir)
 

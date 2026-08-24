@@ -275,6 +275,15 @@ def main() -> None:
     print("Reading baseline.gdx ...")
     baseline = open_gdx(args.makro_root / "Model/Gdx/baseline.gdx")
     detrended, columns = extract_baseline(baseline)
+
+    # Solver-produced shock GDXs must be compared against the solver's own unshocked
+    # reference (the calibration point), which can differ slightly from baseline.gdx.
+    reference_path = args.shocks_dir / "_reference.gdx"
+    if reference_path.exists():
+        print("Reading solver reference (_reference.gdx) for shock comparisons ...")
+        shock_reference, _ = extract_baseline(open_gdx(reference_path))
+    else:
+        shock_reference = detrended
     (args.out / "baseline.json").write_text(
         json.dumps({"years": YEARS, "series": columns, "indicators": {"rHBI": read_hbi(baseline)}}),
         encoding="utf-8",
@@ -287,7 +296,7 @@ def main() -> None:
         for suffix, gdx_path in variants:
             print(f"Reading shock {gdx_path.name} ...")
             payload = {"shock": shock_name, "variation": suffix, "synthetic": False,
-                       **extract_shock(gdx_path, detrended)}
+                       **extract_shock(gdx_path, shock_reference)}
             (args.out / "shocks" / f"{shock_name}{suffix}.json").write_text(json.dumps(payload), encoding="utf-8")
             available.setdefault(shock_name, []).append(suffix)
 
