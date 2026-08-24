@@ -957,8 +957,11 @@ def solve_window(system: System, window: Window, x: np.ndarray,
 
         # Non-monotone acceptance: a full Newton step may raise ||r||_inf temporarily
         # (bilinear cross-terms of large-scale NPV variables) yet be nearly exact in
-        # relative terms — quadratic contraction cleans it up next iteration.
-        reference = min(1e3 * max(history[-3:]), 1e5) if history else np.inf
+        # relative terms — quadratic contraction cleans it up next iteration. The
+        # legitimate rise scales with the RESPONSE size, not the starting residual:
+        # measured ~3e-6 * ||dx||^2 for the NPV recursions, so allow 1e-4 * ||dx||^2.
+        dx_inf = np.abs(dx).max()
+        reference = min(max(1e3 * max(history[-3:]), 1e-4 * dx_inf * dx_inf), 1e7)
         alpha = 1.0
         accepted = False
         for _ in range(8):
