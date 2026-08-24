@@ -556,11 +556,13 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
           f"(years {shock_years}), factor {shock_factor}, delta {shock_delta}")
 
     x = system.levels.copy()
-    solve_shock(system, window, x, shock_vars, targets, tol=tol)
+    checkpoint_path = CACHE_DIR / f"ckpt_{out_path.stem}.npz"
+    solve_shock(system, window, x, shock_vars, targets, tol=tol, checkpoint_path=checkpoint_path)
     residual = np.empty(system.n_eq)
     system.residuals(x, residual)
     print(f"solved: ||r||_inf = {np.abs(residual[window.eq_sel]).max():.3e}")
     export_solution_gdx(convert_dir, x, out_path)
+    checkpoint_path.unlink(missing_ok=True)
 
 
 def cmd_lutest(methods: tuple[str, ...], convert_dir: Path, from_year: int = 2022) -> None:
@@ -904,7 +906,12 @@ def make_direct_solver(matrix):
             import pypardiso
             solver = pypardiso.PyPardisoSolver()
             solver.factorize(scaled)
-            return lambda b: solver.solve(scaled, scale * b)
+
+            def solve(b):
+                return solver.solve(scaled, scale * b)
+
+            solve.cleanup = lambda: solver.free_memory(everything=True)
+            return solve
         if backend == "umfpack":
             from kvxopt import matrix as kmatrix, spmatrix, umfpack
             coo = scaled.tocoo()
@@ -924,20 +931,33 @@ def make_direct_solver(matrix):
     probe_rhs = csr @ np.random.default_rng(3).standard_normal(n)
     probe_norm = np.linalg.norm(probe_rhs) + 1e-300
     order = os.environ.get("FREESOLVER_BACKEND", "pardiso,umfpack,superlu").split(",")
-    last = None
     for backend in order:
+        backend = backend.strip()
+        if backend == "pardiso" and _PARDISO_REJECTIONS[0] >= 3:
+            continue  # proven useless on this system; skip the 40s + memory spike
         try:
-            solve_fn = build(backend.strip())
+            solve_fn = build(backend)
         except ImportError:
             continue
-        last = solve_fn
         rel = np.linalg.norm(csr @ solve_fn(probe_rhs) - probe_rhs) / probe_norm
         if rel < 1e-8:
             return solve_fn
         print(f"  {backend}: factorization rejected (probe rel residual {rel:.1e}), "
               f"falling back", flush=True)
-    print("  WARNING: no backend passed verification; using last available", flush=True)
-    return last
+        if backend == "pardiso":
+            _PARDISO_REJECTIONS[0] += 1
+        # free the rejected factorization BEFORE building the next backend —
+        # holding both overflowed a 64GB box (silent OOM kill mid-UMFPACK)
+        cleanup = getattr(solve_fn, "cleanup", None)
+        if cleanup is not None:
+            cleanup()
+        del solve_fn
+        import gc
+        gc.collect()
+    raise RuntimeError("no linear-solver backend passed verification")
+
+
+_PARDISO_REJECTIONS = [0]
 
 
 class Window:
@@ -1050,10 +1070,12 @@ def solve_window(system: System, window: Window, x: np.ndarray,
 
 
 def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.ndarray,
-                target_values: np.ndarray, tol: float = 1e-9) -> float:
+                target_values: np.ndarray, tol: float = 1e-9,
+                checkpoint_path: Path | None = None) -> float:
     """Continuation on shock size: ramp the exogenous variables to their targets.
 
     Mirrors MAKRO's own homotopy trick (solve at 1/100 size, then rescale).
+    Each converged stage is checkpointed to disk so a killed run resumes.
     """
     base_values = x[shock_vars].copy()
     deltas = target_values - base_values
@@ -1062,6 +1084,14 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.nd
     checkpoint = x.copy()
     lu = None
     attempts = 0
+
+    if checkpoint_path is not None and checkpoint_path.exists():
+        saved = np.load(checkpoint_path)
+        checkpoint = saved["x"]
+        solved_share = float(saved["share"])
+        step = float(saved["step"])
+        x[:] = checkpoint
+        print(f"resumed from checkpoint: share {solved_share:.4f}, step {step:.4f}", flush=True)
 
     while solved_share < 1.0 - 1e-12:
         attempts += 1
@@ -1076,6 +1106,8 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.nd
             solved_share = share
             checkpoint = x.copy()
             step = min(step * 2.5, 1.0 - solved_share) or step
+            if checkpoint_path is not None and solved_share < 1.0:
+                np.savez(checkpoint_path, x=checkpoint, share=solved_share, step=step)
         else:
             step /= 2
             lu = None
