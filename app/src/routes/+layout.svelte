@@ -6,7 +6,8 @@
 
 	const links = [
 		{ href: '/', label: 'Grundforløb' },
-		{ href: '/scenarier/', label: 'Scenarier' }
+		{ href: '/scenarier/', label: 'Scenarier' },
+		{ href: '/validering/', label: 'Validering' }
 	];
 
 	function isActive(href: string): boolean {

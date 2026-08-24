@@ -1,0 +1,67 @@
+{
+	"generated": "2026-08-24",
+	"model": { "name": "MAKRO 2026-June", "commit": "01f2a43" },
+	"system": {
+		"fullEquations": 2197277,
+		"fullVariables": 5836546,
+		"fullFixed": 3639269,
+		"windowEquations": 202666,
+		"windowYears": "2120–2129",
+		"maxResidualAtSolution": 1.4e-9,
+		"evalTimeSeconds": 0.4
+	},
+	"machine": "Apple M1, 16 GB RAM",
+	"reproduce": "etl/freesolver.py — parse, check, newton, oracle (se README)",
+	"recovery": {
+		"perturbation": 1e-4,
+		"iterations": [2.446e2, 1.663e-1, 1.541e-7, 2.561e-9, 1.746e-10],
+		"medianRecovery": 1.5e-15
+	},
+	"oracles": [
+		{
+			"id": "rente",
+			"labelDa": "Rentestød: ECB-renten +100 basispoint (2124)",
+			"shock": "rRenteECB(2124): 3,50 pct. → 4,50 pct.",
+			"gams": { "solver": "IPOPT", "seconds": 65, "status": "Normal Completion / Locally Optimal" },
+			"free": { "finalResidual": 3.492e-10, "note": "adaptiv kontinuation i 7 trin, ikke-monoton Newton" },
+			"responders": 142289,
+			"medianRel": 1.128e-15,
+			"p999Rel": 9.338e-11,
+			"maxRel": 8.368e-6,
+			"irfMedian": 1.986e-12,
+			"trace": {
+				"labelDa": "Sidste kontinuationstrin (69,3 pct. → 100 pct. af stødet)",
+				"iterations": [3.068e-3, 2.834, 2.667e-6, 3.492e-10]
+			},
+			"flagship": true
+		},
+		{
+			"id": "olie",
+			"labelDa": "Oliepris: Brent +10 pct. (2124)",
+			"shock": "pOlieBrent(2124): 686,6 → 755,3",
+			"gams": { "solver": "IPOPT", "seconds": 24, "status": "Normal Completion / Locally Optimal" },
+			"free": { "finalResidual": 5.821e-11, "note": "1 Newton-iteration" },
+			"responders": null,
+			"medianRel": 9.381e-16,
+			"p999Rel": 1.97e-10,
+			"maxRel": 2.424e-6,
+			"irfMedian": null,
+			"noteDa": "I kalibrerings-konfigurationen er de udenlandske pris-kanaler faste input, så stødet forplanter sig kun til få variable. Overensstemmelsen gælder hele systemet.",
+			"flagship": false
+		},
+		{
+			"id": "bni",
+			"labelDa": "Indkomststød: BNI-residual +30 mia. (2124)",
+			"shock": "jvBNI(2124): 0 → 30",
+			"gams": { "solver": "IPOPT", "seconds": 42, "status": "Normal Completion / Locally Optimal" },
+			"free": { "finalResidual": 2.328e-10, "note": "2 Newton-iterationer" },
+			"responders": null,
+			"medianRel": 1.273e-15,
+			"p999Rel": 2.372e-10,
+			"maxRel": 1.533e-5,
+			"irfMedian": null,
+			"noteDa": "jvBNI er et bogførings-residual; stødet tester regnemaskineriet snarere end økonomien.",
+			"flagship": false
+		}
+	]
+}
