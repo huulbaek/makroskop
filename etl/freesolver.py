@@ -879,19 +879,31 @@ def solve_linear(jac_sorted, rhs: np.ndarray, year_offsets: np.ndarray,
 
 
 def make_direct_solver(matrix):
-    """Factorize once, return a solve callable. Prefers MKL Pardiso (x86) over SuperLU."""
+    """Factorize once, return a solve callable. Prefers MKL Pardiso (x86) over SuperLU.
+
+    Rows are equilibrated first: this system mixes ~1e5-scale NPV rows with
+    ~1e-2-scale ratio rows, which wrecks pivot quality (observed as sporadic
+    Pardiso factorizations too inaccurate for Newton's final digits).
+    """
+    from scipy import sparse
+
+    csr = matrix.tocsr()
+    magnitude = csr.copy()
+    magnitude.data = np.abs(magnitude.data)
+    row_max = magnitude.max(axis=1).toarray().ravel()
+    scale = np.where(row_max > 0, 1.0 / np.maximum(row_max, 1e-300), 1.0)
+    scaled = (sparse.diags(scale) @ csr).tocsr()
     try:
         import pypardiso
 
         solver = pypardiso.PyPardisoSolver()
-        csr = matrix.tocsr()
-        solver.factorize(csr)
-        return lambda b: solver.solve(csr, b)
+        solver.factorize(scaled)
+        return lambda b: solver.solve(scaled, scale * b)
     except ImportError:
         from scipy.sparse.linalg import splu
 
-        lu = splu(matrix)
-        return lu.solve
+        lu = splu(scaled.tocsc())
+        return lambda b: lu.solve(scale * b)
 
 
 class Window:
@@ -949,11 +961,19 @@ def solve_window(system: System, window: Window, x: np.ndarray,
         factor_time = time.time() - t0
         solve_fn, matrix = lu
         rhs = -residual_full[window.eq_perm]
+        rhs_norm = np.linalg.norm(rhs) + 1e-300
         dx = solve_fn(rhs)
-        # iterative refinement: Pardiso's default accuracy (~1e-6) is far too loose
-        # for Newton to reach 1e-9 residuals; two passes reach ~1e-12 on any backend
-        for _ in range(2):
-            dx += solve_fn(rhs - matrix @ dx)
+        # iterative refinement to measured convergence: backends (Pardiso especially)
+        # deliver ~1e-6 accuracy alone, far too loose for Newton's final digits
+        for _ in range(6):
+            linear_residual = rhs - matrix @ dx
+            if np.linalg.norm(linear_residual) < 1e-11 * rhs_norm:
+                break
+            dx += solve_fn(linear_residual)
+        else:
+            rel = np.linalg.norm(rhs - matrix @ dx) / rhs_norm
+            if rel > 1e-8:
+                print(f"  WARNING: linear solve stalled at rel residual {rel:.1e}", flush=True)
 
         # Non-monotone acceptance: a full Newton step may raise ||r||_inf temporarily
         # (bilinear cross-terms of large-scale NPV variables) yet be nearly exact in
@@ -1017,7 +1037,7 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.nd
         x[:] = checkpoint
         x[shock_vars] = base_values + share * deltas
         print(f"--- continuation: {solved_share:.4f} -> {share:.4f} of shock ---", flush=True)
-        norm, lu = solve_window(system, window, x, tol=tol, max_iter=5, lu_reuse=lu)
+        norm, lu = solve_window(system, window, x, tol=tol, max_iter=8, lu_reuse=lu)
         if norm < tol:
             solved_share = share
             checkpoint = x.copy()
