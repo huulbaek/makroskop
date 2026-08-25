@@ -46,6 +46,11 @@ Flere stød: kopiér et `solve-export`-kald i `run.sh` og skift `--shock-name`
 (dict-navn), `--shock-years`, `--shock-factor`/`--shock-delta` og `--out`
 (filnavnet skal matche stød-kataloget i `catalog.py`: `<Navn><variant>.gdx`).
 
+Midlertidige stød: `--shock-profile ar` (0,9^dt — DREAMs AR_profile, filnavn `_midl`),
+`--shock-profile blip` (kun stødåret, `_blip`) eller `linear` (1 − 0,25·dt). Profilen
+vægter ændringen år for år fra det første stødår; alle varianter er ufinansierede.
+`cloud/run_batch3.sh` kører de midlertidige varianter af de allerede løste stød.
+
 ## Ny MAKRO-version: grundforløb og scenarier skifter samlet
 
 DREAM udgiver nye versioner 2–4 gange om året (fx 2025-December, 2026-Maj, 2026-June);

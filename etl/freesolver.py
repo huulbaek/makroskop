@@ -563,8 +563,12 @@ def export_solution_gdx(convert_dir: Path, x: np.ndarray, out_path: Path,
 
 def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, int] | None,
                      shock_factor: float, shock_delta: float, out_path: Path,
-                     convert_dir: Path, tol: float, export_stages: bool = False) -> None:
+                     convert_dir: Path, tol: float, export_stages: bool = False,
+                     shock_profile: str = "permanent") -> None:
     """Solve a (possibly multi-year) shock with continuation and export the solution as GDX.
+
+    shock_profile scales the change per year (see profile_weight): the instrument becomes
+    level * (1 + (factor - 1) * w(t)) + delta * w(t), with dt counted from the first shock year.
 
     With export_stages, every converged continuation stage (1 %, 3.5 %, ... of the
     shock) is also written as a compact GDX `<out>_sNNN.gdx` (NNN = share in
@@ -574,7 +578,10 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
     window = Window(system, convert_dir, from_year)
     print(f"window: {len(window.eq_sel):,} equations ({window.n_years} years)")
 
-    shock_vars = np.array(find_shock_variables(convert_dir, shock_name, shock_years))
+    matched = find_shock_variables_with_years(convert_dir, shock_name, shock_years)
+    shock_vars = np.array([var_id for var_id, _ in matched])
+    first_year = min(year for _, year in matched)
+    weights = np.array([profile_weight(shock_profile, year - first_year) for _, year in matched])
     fixed_ok = system.is_fixed[shock_vars]
     if not fixed_ok.any():
         raise SystemExit(f"all {len(shock_vars)} matched shock variables are endogenous")
@@ -583,9 +590,13 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
         print(f"  filtering {int((~fixed_ok).sum())} endogenous instances "
               f"(aggregates); shocking {int(fixed_ok.sum())} exogenous ones")
         shock_vars = shock_vars[fixed_ok]
-    targets = system.levels[shock_vars] * shock_factor + shock_delta
-    print(f"shock: {shock_name} x {len(shock_vars)} instances "
-          f"(years {shock_years}), factor {shock_factor}, delta {shock_delta}")
+        weights = weights[fixed_ok]
+    levels = system.levels[shock_vars]
+    targets = levels * (1.0 + (shock_factor - 1.0) * weights) + shock_delta * weights
+    active = shock_vars[weights > 0]
+    print(f"shock: {shock_name} x {len(shock_vars)} instances (years {shock_years}), "
+          f"factor {shock_factor}, delta {shock_delta}, profile {shock_profile} "
+          f"({len(active)} instances actually moved)")
 
     meta = {
         "fingerprint": model_fingerprint(convert_dir),
@@ -594,6 +605,7 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
         "shock_years": f"{shock_years[0]}-{shock_years[1]}" if shock_years else "",
         "factor": repr(shock_factor),
         "delta": repr(shock_delta),
+        "profile": shock_profile,
         "from_year": str(from_year),
         "exported": datetime.date.today().isoformat(),
     }
@@ -1201,15 +1213,22 @@ def cmd_newton(perturb: float, max_iter: int, tol: float, from_year: int, conver
 
 
 def find_shock_variables(convert_dir: Path, name: str, years: tuple[int, int] | None) -> list[int]:
-    """Variable ids for a shock spec.
+    """Variable ids for a shock spec (see find_shock_variables_with_years)."""
+    return [var_id for var_id, _ in find_shock_variables_with_years(convert_dir, name, years)]
+
+
+def find_shock_variables_with_years(convert_dir: Path, name: str,
+                                    years: tuple[int, int] | None) -> list[tuple[int, int]]:
+    """(variable id, year) pairs for a shock spec.
 
     'rRenteECB(2124)' -> that exact instance; 'rRenteECB' + years -> every instance
     (all domain combinations) whose final index falls in the year range.
     """
     if "(" in name:
-        return [find_variable(convert_dir, name)]
+        year = name.rstrip(")").rsplit(",", 1)[-1].rsplit("(", 1)[-1]
+        return [(find_variable(convert_dir, name), int(year) if year.isdigit() else 0)]
     prefix = name + "("
-    ids: list[int] = []
+    ids: list[tuple[int, int]] = []
     with (convert_dir / "dict.txt").open(encoding="utf-8") as handle:
         in_vars = False
         for line in handle:
@@ -1225,10 +1244,31 @@ def find_shock_variables(convert_dir: Path, name: str, years: tuple[int, int] | 
             if not last_key.isdigit():
                 continue
             if years is None or years[0] <= int(last_key) <= years[1]:
-                ids.append(int(parts[0][1:]) - 1)
+                ids.append((int(parts[0][1:]) - 1, int(last_key)))
     if not ids:
         raise SystemExit(f"no variables matched shock spec {name!r} in years {years}")
     return ids
+
+
+SHOCK_PROFILES = ("permanent", "ar", "linear", "blip")
+
+
+def profile_weight(profile: str, years_since_start: int) -> float:
+    """MAKRO's standard shock profiles (Analysis/Standard_shocks/standard_shocks.gms).
+
+    permanent: 1 every year; ar: 0.9**dt (the Finance Ministry multiplier standard);
+    linear: max(1 - 0.25*dt, 0); blip: 1 in the shock year only.
+    """
+    dt = years_since_start
+    if profile == "permanent":
+        return 1.0
+    if profile == "ar":
+        return 0.9 ** dt
+    if profile == "linear":
+        return max(1.0 - 0.25 * dt, 0.0)
+    if profile == "blip":
+        return 1.0 if dt == 0 else 0.0
+    raise SystemExit(f"unknown shock profile {profile!r}; choose from {SHOCK_PROFILES}")
 
 
 def find_variable(convert_dir: Path, name: str) -> int:
@@ -1501,6 +1541,9 @@ def main() -> None:
     parser.add_argument("--tol", type=float, default=1e-9)
     parser.add_argument("--lu-method", default="umfpack")
     parser.add_argument("--from-year", type=int, default=2110)
+    parser.add_argument("--shock-profile", choices=SHOCK_PROFILES, default="permanent",
+                        help="solve-export: MAKRO standard profile over the shock years "
+                             "(permanent | ar = 0.9^dt | linear = 1-0.25dt | blip = first year only)")
     parser.add_argument("--export-stages", action="store_true",
                         help="solve-export: also write each converged continuation stage as <out>_sNNN.gdx")
     parsed = parser.parse_args()
@@ -1534,7 +1577,7 @@ def main() -> None:
             years = (int(lo), int(hi or lo))
         cmd_solve_export(parsed.from_year, parsed.shock_name, years, parsed.shock_factor,
                          parsed.shock_delta, parsed.out, parsed.convert_dir, parsed.tol,
-                         export_stages=parsed.export_stages)
+                         export_stages=parsed.export_stages, shock_profile=parsed.shock_profile)
     else:
         cmd_newton(parsed.perturb, parsed.max_iter, parsed.tol, parsed.from_year, parsed.convert_dir)
 

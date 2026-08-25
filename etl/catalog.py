@@ -180,8 +180,8 @@ _DREAM_GDP_NORM = (
 
 SHOCK_RUNS: list[ShockRun] = [
     ShockRun("Rente", "rRenteECB", "ECB-renten", 1.0, 0.01, "+1 pct.-point (100 basispoint)", 2030,
-             "Samme instrument og størrelse som DREAMs standardstød \"Rente\" (rRenteECB + 0,01). "
-             "DREAM lægger stødet ind fra modellens første prognoseår, MAKROskop fra 2030. "
+             "Samme instrument, størrelse og stødår (2030) som DREAMs standardstød \"Rente\" "
+             "(rRenteECB + 0,01). "
              "Alle danske renter i MAKRO er bygget oven på ECB-renten (obligations-, bank- og "
              "virksomhedernes afkastkrav), så gennemslaget er 1:1; udenlandske priser er uændrede, "
              "så det er reelt en permanent højere realrente.",
@@ -210,16 +210,32 @@ SHOCK_RUNS: list[ShockRun] = [
              series_key="nPop"),
 ]
 
+_UNFINANCED = (
+    "Ufinansieret: ingen skattesats reagerer. Virkningen på de offentlige finanser akkumulerer "
+    "derfor over tid og er ikke et holdbart forløb."
+)
+_UNFINANCED_TEMP = (
+    "Ufinansieret: ingen skattesats reagerer. (DREAMs tilsvarende variant er finansieret via "
+    "den beregningstekniske lukkeskat — det kan den frie løser ikke endnu.)"
+)
+
+# Profiles follow Analysis/Standard_shocks/standard_shocks.gms: dt = år siden stødåret.
 VARIATION_DEFINITIONS: dict[str, dict[str, str]] = {
-    "_blip": {"profile_da": "Ét år: stødet gælder kun i det første år.",
-              "closure_da": "Finansieret: den beregningstekniske lukkeskat justeres, så de offentlige finanser forbliver holdbare."},
-    "_midl": {"profile_da": "Midlertidigt: fuldt stød i første år, derefter lineært aftrappet (DREAMs AR-profil).",
-              "closure_da": "Finansieret: den beregningstekniske lukkeskat justeres, så de offentlige finanser forbliver holdbare."},
-    "_perm": {"profile_da": "Permanent: stødet gælder alle år fra første stødår og horisonten ud.",
-              "closure_da": "Finansieret: den beregningstekniske lukkeskat justeres, så de offentlige finanser forbliver holdbare."},
-    "_ufin": {"profile_da": "Permanent: stødet gælder alle år fra første stødår og horisonten ud.",
-              "closure_da": "Ufinansieret: ingen skattesats reagerer. Virkningen på de offentlige finanser akkumulerer derfor over tid og er ikke et holdbart forløb."},
+    "_blip": {"profile_da": "Ét år: stødet gælder kun i stødåret (DREAMs blip_profile).",
+              "closure_da": _UNFINANCED_TEMP},
+    "_midl": {"profile_da": "Midlertidigt: fuldt stød i stødåret, derefter 0,9 pr. år "
+                            "(100, 90, 81, 73 pct. … — DREAMs AR_profile, Finansministeriets "
+                            "multiplikator-standard).",
+              "closure_da": _UNFINANCED_TEMP},
+    "_perm": {"profile_da": "Permanent: stødet gælder alle år fra stødåret og horisonten ud.",
+              "closure_da": "Finansieret: den beregningstekniske lukkeskat justeres, så de offentlige "
+                            "finanser forbliver holdbare."},
+    "_ufin": {"profile_da": "Permanent: stødet gælder alle år fra stødåret og horisonten ud.",
+              "closure_da": _UNFINANCED},
 }
+
+# solve-export --shock-profile value that produces each variation.
+VARIATION_PROFILES: dict[str, str] = {"_blip": "blip", "_midl": "ar", "_perm": "permanent", "_ufin": "permanent"}
 
 
 def shock_definition(shock_name: str, suffix: str, last_year: int) -> dict | None:
