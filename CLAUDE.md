@@ -1,6 +1,9 @@
-# Project Instructions for AI Agents
+# MAKROskop
 
-This file provides instructions and context for AI coding agents working on this project.
+Public-facing explorer + license-free solver for MAKRO (DREAM's macroeconomic model
+of Denmark, used by the Finance Ministry). Upstream model: `~/vserver/MAKRO`
+(pristine clone — never modify; we read `Model/deep_dynamic_calibration.zip` and
+`Model/Gdx/baseline.gdx` from it).
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:6cd5cc61 -->
 ## Beads Issue Tracker
@@ -58,20 +61,41 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 <!-- END BEADS INTEGRATION -->
 
 
-## Build & Test
+## Layout
 
-_Add your build and test commands here_
+- `app/` — SvelteKit static site (Svelte 5 runes, bun). Pages: Grundforløb (baseline),
+  Scenarier (shock explorer), Validering (two-solver comparison). Build: `bun run build`.
+- `etl/` — Python (uv). `extract.py` writes `app/static/data/*.json` from GDX files.
+  `freesolver.py` is the license-free solver: parse / check / jacobian / newton /
+  oracle / solve-export / export-baseline. Cache in `etl/cache/` (regenerable).
+- `cloud/` — Hetzner box workflow: `pack.sh` (local bundle) → `setup.sh` → `run.sh` /
+  `run_batch2.sh` (checkpointed, resumable scenario batches). See `cloud/README.md`.
 
-```bash
-# Example:
-# npm install
-# npm test
-```
+## Critical knowledge (learned the hard way)
 
-## Architecture Overview
+- Solver scenarios MUST be compared against `etl/shock_gdx/_reference.gdx` (the zip's
+  calibration point), never `baseline.gdx` — they differ 0.3–9% on levels. extract.py
+  handles this automatically when `_reference.gdx` exists.
+- Full-horizon (2.2M eq) direct factorization needs ~64GB → rented Hetzner box
+  (CCX43/53, x86, Ubuntu). A 16GB laptop manages ≤ ~12-year windows.
+- Linear solvers: verified backend chain in `make_direct_solver` (Pardiso probe-tested,
+  falls back to UMFPACK/kvxopt — the reliable workhorse — then SuperLU). Never trust an
+  unverified Pardiso factorization. Rows are equilibrated; refinement runs to 1e-11.
+- Newton needs non-monotone acceptance (NPV variables legitimately spike the residual
+  on full steps) + adaptive shock-size continuation with per-stage disk checkpoints.
+- GAMS oracle runs (freesolver oracle) need the user's personal GAMS license
+  (network-validated → run Bash with sandbox disabled) and gamspy_base's `gams` binary.
+- GAMS gotcha: `*` is a comment only in column 1; indented `*` is multiplication.
+- Memory safety on 16GB laptops: run factorizations in killable subprocesses or with
+  swap-growth watchdogs; the first uncapped run swap-froze and crashed the machine.
+- Shock design: instruments must be exogenous (`is_fixed`). Mapped: tBund, tAMbidrag,
+  tSelskab, tEjd, uG (offentligt forbrug), uvOvfSats (overførsler), uXMarked, nPop
+  (single ages), rRenteECB, pOlieBrent (NB: propagates to almost nothing in this
+  configuration — needs the foreign-price bundle from standard_shocks.gms).
 
-_Add a brief overview of your project architecture_
+## Conventions
 
-## Conventions & Patterns
-
-_Add your project-specific conventions here_
+- Danish-first UI; MAKRO brand teal #14AFA6 is UI-only, never a chart series color.
+- Scenario GDX naming: `<CatalogShockName><variant>.gdx` (e.g. `Bundskat_ufin.gdx`)
+  matching `etl/catalog.py` SHOCKS + VARIATIONS; `_ufin` = no fiscal reaction.
+- Commit style: descriptive body, Claude-Session trailer.
