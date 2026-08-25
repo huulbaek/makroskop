@@ -549,8 +549,13 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
 
     shock_vars = np.array(find_shock_variables(convert_dir, shock_name, shock_years))
     fixed_ok = system.is_fixed[shock_vars]
+    if not fixed_ok.any():
+        raise SystemExit(f"all {len(shock_vars)} matched shock variables are endogenous")
     if not fixed_ok.all():
-        raise SystemExit(f"{(~fixed_ok).sum()} of {len(shock_vars)} shock variables are endogenous")
+        # e.g. nPop: single ages are exogenous, aggregates endogenous — shock only the former
+        print(f"  filtering {int((~fixed_ok).sum())} endogenous instances "
+              f"(aggregates); shocking {int(fixed_ok.sum())} exogenous ones")
+        shock_vars = shock_vars[fixed_ok]
     targets = system.levels[shock_vars] * shock_factor + shock_delta
     print(f"shock: {shock_name} x {len(shock_vars)} instances "
           f"(years {shock_years}), factor {shock_factor}, delta {shock_delta}")

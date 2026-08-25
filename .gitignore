@@ -26,3 +26,7 @@ etl/*.log
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# beads runtime db (export via bd export is versioned instead)
+.beads/*.db
+.beads/*.db-*
