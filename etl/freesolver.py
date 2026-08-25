@@ -566,6 +566,7 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
     residual = np.empty(system.n_eq)
     system.residuals(x, residual)
     print(f"solved: ||r||_inf = {np.abs(residual[window.eq_sel]).max():.3e}")
+    print(f"peak RSS this process: {peak_rss_gb():.1f} GB")
     export_solution_gdx(convert_dir, x, out_path)
     checkpoint_path.unlink(missing_ok=True)
 
@@ -883,6 +884,14 @@ def solve_linear(jac_sorted, rhs: np.ndarray, year_offsets: np.ndarray,
     solution, info = lgmres(jac_sorted, rhs, M=operator, rtol=rtol, maxiter=60,
                             callback=callback)
     return solution, info, iterations[0]
+
+
+def peak_rss_gb() -> float:
+    import resource
+    import sys
+
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak / (1024**3 if sys.platform == "darwin" else 1024**2)  # bytes on macOS, KB on Linux
 
 
 def make_direct_solver(matrix):
