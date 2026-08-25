@@ -68,6 +68,8 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 - `etl/` — Python (uv). `extract.py` writes `app/static/data/*.json` from GDX files.
   `freesolver.py` is the license-free solver: parse / check / jacobian / newton /
   oracle / solve-export / export-baseline. Cache in `etl/cache/` (regenerable).
+- Deploy: `Dockerfile` (bun build → nginx) as a Dokploy Application on the `nodalit` host
+  (ssh alias; UI ployduck.nodalit.com), domain makroskop.nodalit.com; push to `main` redeploys.
 - `cloud/` — Hetzner box workflow: `pack.sh` (local bundle) → `setup.sh` → `run.sh` /
   `run_batch2.sh` (checkpointed, resumable scenario batches). See `cloud/README.md`.
 

@@ -17,8 +17,9 @@ app/build/
 # freesolver parse cache (regenerate with: uv run python freesolver.py parse)
 etl/cache/
 
-# cloud bundle
+# cloud bundle (packed + unpacked)
 makroskop-cloud.tar.gz
+makroskop-cloud/
 etl/*.log
 
 # Beads / Dolt files (added by bd init)

@@ -1,0 +1,8 @@
+# Only app/ (minus its build products) reaches the image.
+*
+!app/
+app/node_modules
+app/build
+app/.svelte-kit
+app/.vercel
+app/.vscode

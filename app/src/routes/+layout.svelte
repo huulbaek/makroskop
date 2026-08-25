@@ -22,6 +22,16 @@
 		name="description"
 		content="Udforsk dansk økonomi gennem MAKRO – den makroøkonomiske model bag Finansministeriets regnestykker."
 	/>
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="MAKROskop" />
+	<meta property="og:title" content="MAKROskop – udforsk MAKRO uden licens" />
+	<meta
+		property="og:description"
+		content="Grundforløb, stød-scenarier og en uafhængig validering af DREAMs makroøkonomiske model MAKRO – beregnet med en fri løser."
+	/>
+	<meta property="og:locale" content="da_DK" />
+	<meta name="twitter:card" content="summary" />
+	<meta name="theme-color" content="#14AFA6" />
 </svelte:head>
 
 <div class="shell">
@@ -51,6 +61,7 @@
 		</p>
 		<p class="stamp mono">
 			{data.meta.model.name} · {data.meta.model.commit} · sidste dataår {data.meta.lastDataYear}
+			<span class="sep">·</span> MAKROskop{#if __APP_COMMIT__} {__APP_COMMIT__}{/if} · bygget {__BUILD_DATE__}
 		</p>
 	</footer>
 </div>
@@ -132,5 +143,10 @@
 
 	.stamp {
 		font-size: 11px;
+	}
+
+	.sep {
+		margin: 0 4px;
+		opacity: 0.6;
 	}
 </style>
