@@ -61,7 +61,7 @@
 		</p>
 		<p class="stamp mono">
 			{data.meta.model.name} · {data.meta.model.commit} · sidste dataår {data.meta.lastDataYear}
-			<span class="sep">·</span> MAKROskop{#if __APP_COMMIT__} {__APP_COMMIT__}{/if} · bygget {__BUILD_DATE__}
+			<span class="sep">·</span> MAKROskop{__APP_COMMIT__ ? ` ${__APP_COMMIT__}` : ''} · bygget {__BUILD_DATE__}
 		</p>
 	</footer>
 </div>

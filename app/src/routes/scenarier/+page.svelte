@@ -73,7 +73,10 @@
 	const charts = $derived.by(() => {
 		if (!scenario) return [];
 		const bySeriesKey = new Map(meta.series.map((s) => [s.key, s]));
-		return chartKeys
+		// The shocked instrument itself leads, so the cause is visible next to the effects.
+		const instrument = scenario.definition?.seriesKey;
+		const keys = instrument && !chartKeys.includes(instrument) ? [instrument, ...chartKeys] : chartKeys;
+		return keys
 			.filter((key) => scenario!.deviations[key]?.some((v) => v != null))
 			.map((key) => {
 				const info = bySeriesKey.get(key);
@@ -81,6 +84,7 @@
 				return {
 					key,
 					title: info?.labelDa ?? key,
+					isInstrument: key === instrument,
 					unit: pct ? 'afvigelse fra grundforløb, pct.' : 'afvigelse, pct.-point',
 					suffix: pct ? ' pct.' : ' pct.-point',
 					values: scenario!.deviations[key]
@@ -164,6 +168,36 @@
 			</div>
 		{/if}
 
+		{#if scenario?.definition}
+			{@const def = scenario.definition}
+			<section class="card definition" aria-label="Stødets definition">
+				<h3>Sådan er stødet defineret</h3>
+				<dl>
+					<div>
+						<dt>Instrument</dt>
+						<dd><code class="mono">{def.instrument}</code> — {def.instrumentDa}</dd>
+					</div>
+					<div>
+						<dt>Ændring</dt>
+						<dd><strong>{def.changeDa}</strong> i forhold til grundforløbet, hvert år fra {def.firstYear}</dd>
+					</div>
+					<div>
+						<dt>Profil</dt>
+						<dd>{def.profileDa} Modellen løses frem til {def.lastYear}.</dd>
+					</div>
+					<div>
+						<dt>Finansiering</dt>
+						<dd>{def.closureDa}</dd>
+					</div>
+					<div>
+						<dt>Beregnet med</dt>
+						<dd>{def.solver} — <a href="/validering/">se valideringen</a></dd>
+					</div>
+				</dl>
+				<p class="dream-note">{def.dreamDa}</p>
+			</section>
+		{/if}
+
 		{#if scenario}
 			{#if scenario.hbi != null}
 				<div class="hbi-row">
@@ -177,8 +211,9 @@
 			{/if}
 			<div class="chart-grid" class:is-demo={scenario.synthetic} style:opacity={loading ? 0.5 : 1}>
 				{#each charts as chart (chart.key)}
-					<div class="card chart-card">
+					<div class="card chart-card" class:instrument={chart.isInstrument}>
 						{#if scenario.synthetic}<span class="demo-badge" aria-hidden="true">DEMO</span>{/if}
+						{#if chart.isInstrument}<span class="instrument-badge">Stødet (input)</span>{/if}
 						<LineChart
 							title={chart.title}
 							code={chart.key}
@@ -199,14 +234,14 @@
 				<h3>Endnu ikke beregnet</h3>
 				<p>
 					Dette stød er defineret i MAKROs standardkatalog
-					(<code>Analysis/Standard_shocks/standard_shocks.gms</code>), men resultatet er ikke beregnet her.
-					En kørsel kræver GAMS med CONOPT4-licens og tager få minutter pr. scenarie fra modellens
-					medfølgende savepoint.
+					(<code>Analysis/Standard_shocks/standard_shocks.gms</code>), men er ikke løst i MAKROskop
+					endnu. Hvert scenarie er én kørsel med den frie løser over hele modellens horisont — det
+					kræver en maskine med ca. 64 GB hukommelse og tager nogle timer.
 				</p>
 				<p>
-					Når GDX-filen (fx <code class="mono">{selectedName}_ufin.gdx</code>) lægges i
+					Når resultatfilen (fx <code class="mono">{selectedName}_ufin.gdx</code>) lægges i
 					<code>etl/shock_gdx/</code> og <code>extract.py</code> køres igen, dukker kurverne op her
-					automatisk.
+					automatisk — sammen med stødets definition.
 				</p>
 			</div>
 		{/if}
@@ -214,11 +249,12 @@
 		<div class="method card">
 			<h2>Sådan skal kurverne læses</h2>
 			<p>
-				Hvert stød er normeret (typisk 1 pct. af BNP eller 1 pct.-point) og indføres i {meta.defaultShockYear}.
 				Kurverne viser forskellen mellem scenariet og grundforløbet – i procent for mængder og priser, i
-				procentpoint for satser og saldi. Varianterne følger MAKROs standardprofiler: et enkelt år, midlertidigt
-				aftrappet (AR-profil som Finansministeriets multiplikatorer), permanent finansieret og permanent
-				ufinansieret.
+				procentpoint for satser og saldi. Stødet lægges ind i {meta.defaultShockYear}; den nøjagtige
+				størrelse og hvad der ændres, står i boksen "Sådan er stødet defineret" for hvert beregnet
+				scenarie. Varianterne følger MAKROs standardprofiler: et enkelt år, midlertidigt aftrappet
+				(AR-profil), permanent finansieret og permanent ufinansieret — indtil videre er kun de
+				ufinansierede varianter løst.
 			</p>
 		</div>
 	</div>
@@ -242,6 +278,86 @@
 		color: var(--ink-secondary);
 		max-width: 60ch;
 		margin: 10px 0 0;
+	}
+
+	.definition {
+		margin-bottom: 14px;
+		border-color: var(--makro);
+	}
+
+	.definition h3 {
+		font-size: 15px;
+		margin-bottom: 8px;
+	}
+
+	.definition dl {
+		margin: 0;
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		gap: 6px 14px;
+		font-size: 13.5px;
+	}
+
+	.definition dl > div {
+		display: contents;
+	}
+
+	.definition dt {
+		color: var(--ink-muted);
+		font-size: 12px;
+		padding-top: 2px;
+	}
+
+	.definition dd {
+		margin: 0;
+		color: var(--ink-secondary);
+	}
+
+	.definition dd strong {
+		color: var(--ink);
+	}
+
+	.definition code {
+		color: var(--makro-strong);
+		background: var(--makro-wash);
+		padding: 1px 5px;
+		border-radius: 3px;
+	}
+
+	.dream-note {
+		font-size: 12.5px;
+		color: var(--ink-muted);
+		margin: 10px 0 0;
+		max-width: 80ch;
+	}
+
+	.chart-card.instrument {
+		border-color: var(--makro);
+		position: relative;
+	}
+
+	.instrument-badge {
+		position: absolute;
+		top: 8px;
+		right: 10px;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--makro-strong);
+		background: var(--makro-wash);
+		padding: 2px 6px;
+		border-radius: 3px;
+	}
+
+	@media (max-width: 520px) {
+		.definition dl {
+			grid-template-columns: 1fr;
+			gap: 2px;
+		}
+		.definition dt {
+			margin-top: 6px;
+		}
 	}
 
 	.workbench {

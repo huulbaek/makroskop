@@ -149,3 +149,92 @@ VARIATIONS = [
     ("_perm", "Permanent, finansieret", "Permanent, financed"),
     ("_ufin", "Permanent, ufinansieret", "Permanent, unfinanced"),
 ]
+
+
+@dataclass(frozen=True)
+class ShockRun:
+    """How MAKROskop's free solver actually implements a catalog shock.
+
+    Mirrors the `solve-export` calls in cloud/run.sh and cloud/run_batch2.sh: the
+    exogenous `instrument` is set to `level * factor + delta` in every year of the
+    shock window and the model is re-solved. `dream_da` states how this differs
+    from DREAM's own standard shock of the same name (Analysis/Standard_shocks).
+    """
+    shock: str            # catalog name (ShockDef.name)
+    instrument: str       # exogenous model variable
+    instrument_da: str    # the model's own label for it
+    factor: float
+    delta: float
+    change_da: str        # the change in words, e.g. "+1 pct.-point"
+    first_year: int
+    dream_da: str
+    series_key: str | None = None  # SERIES key of the instrument, if it is a catalog series
+
+
+_DREAM_GDP_NORM = (
+    "DREAMs standardstød af samme navn normerer i stedet ændringen til 1 pct. af BNP i provenu "
+    "(og sænker satsen); MAKROskop ændrer selve satsen med et fast beløb. Størrelserne er derfor "
+    "ikke direkte sammenlignelige."
+)
+
+SHOCK_RUNS: list[ShockRun] = [
+    ShockRun("Rente", "rRenteECB", "ECB-renten", 1.0, 0.01, "+1 pct.-point (100 basispoint)", 2030,
+             "Samme instrument og størrelse som DREAMs standardstød \"Rente\" (rRenteECB + 0,01). "
+             "DREAM lægger stødet ind fra modellens første prognoseår, MAKROskop fra 2030. "
+             "Alle danske renter i MAKRO er bygget oven på ECB-renten (obligations-, bank- og "
+             "virksomhedernes afkastkrav), så gennemslaget er 1:1; udenlandske priser er uændrede, "
+             "så det er reelt en permanent højere realrente.",
+             series_key="rRenteECB"),
+    ShockRun("Oliepris", "pOlieBrent", "Prisnotering på råolie, Brent", 1.10, 0.0, "+10 pct.", 2030,
+             "Samme størrelse som DREAMs standardstød. I kalibrerings-konfigurationen er de udenlandske "
+             "priskanaler faste input, så stødet forplanter sig kun til få variable."),
+    ShockRun("Bundskat", "tBund", "Bundskattesats", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM),
+    ShockRun("AM_bidrag", "tAMbidrag", "Arbejdsmarkedsbidrag, sats", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM),
+    ShockRun("Selskabsskat", "tSelskab", "Selskabsskattesats", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM),
+    ShockRun("Ejendomsvaerdiskat", "tEjd", "Ejendomsværdiskat, implicit sats", 1.10, 0.0, "+10 pct. af satsen", 2030, _DREAM_GDP_NORM),
+    ShockRun("Offentligt_forbrug", "uG", "Skalaparameter i det offentlige forbrugsnest", 1.01, 0.0, "+1 pct.", 2030,
+             "DREAMs standardstød hæver offentlige varekøb, beskæftigelse og investeringer svarende til "
+             "1 pct. af BNP; MAKROskop skalerer det offentlige forbrugsnest med 1 pct."),
+    ShockRun("Skattepligtig_indkomstoverforsel", "uvOvfSats", "Satser for skattepligtige overførsler", 1.01, 0.0, "+1 pct.", 2030,
+             "DREAMs standardstød normerer ændringen til 1 pct. af BNP; MAKROskop hæver satserne med 1 pct."),
+    ShockRun("Eksportmarkedsvaekst", "uXMarked", "Eksportmarkedets størrelse", 1.01, 0.0, "+1 pct.", 2030,
+             "DREAMs standardstød normerer ændringen til 1 pct. af BNP i eksport; MAKROskop hæver "
+             "eksportmarkedet med 1 pct."),
+    ShockRun("Befolkning", "nPop", "Befolkning, alle aldersgrupper", 1.01, 0.0, "+1 pct.", 2030,
+             "Samme størrelse som DREAMs standardstød, men DREAM skalerer desuden offentligt forbrug og "
+             "arbejdsstyrke med; MAKROskop ændrer kun befolkningen.",
+             series_key="nPop"),
+]
+
+VARIATION_DEFINITIONS: dict[str, dict[str, str]] = {
+    "_blip": {"profile_da": "Ét år: stødet gælder kun i det første år.",
+              "closure_da": "Finansieret: den beregningstekniske lukkeskat justeres, så de offentlige finanser forbliver holdbare."},
+    "_midl": {"profile_da": "Midlertidigt: fuldt stød i første år, derefter lineært aftrappet (DREAMs AR-profil).",
+              "closure_da": "Finansieret: den beregningstekniske lukkeskat justeres, så de offentlige finanser forbliver holdbare."},
+    "_perm": {"profile_da": "Permanent: stødet gælder alle år fra første stødår og horisonten ud.",
+              "closure_da": "Finansieret: den beregningstekniske lukkeskat justeres, så de offentlige finanser forbliver holdbare."},
+    "_ufin": {"profile_da": "Permanent: stødet gælder alle år fra første stødår og horisonten ud.",
+              "closure_da": "Ufinansieret: ingen skattesats reagerer. Virkningen på de offentlige finanser akkumulerer derfor over tid og er ikke et holdbart forløb."},
+}
+
+
+def shock_definition(shock_name: str, suffix: str, last_year: int) -> dict | None:
+    """Definition block written into a scenario JSON, or None if the run is not catalogued."""
+    run = next((r for r in SHOCK_RUNS if r.shock == shock_name), None)
+    variation = VARIATION_DEFINITIONS.get(suffix)
+    if run is None or variation is None:
+        return None
+    return {
+        "instrument": run.instrument,
+        "instrumentDa": run.instrument_da,
+        "changeDa": run.change_da,
+        "factor": run.factor,
+        "delta": run.delta,
+        "firstYear": run.first_year,
+        "lastYear": last_year,
+        "profileDa": variation["profile_da"],
+        "closureDa": variation["closure_da"],
+        "dreamDa": run.dream_da,
+        "seriesKey": run.series_key,
+        "solver": "MAKROskops frie løser (Newton, fuld horisont)",
+    }

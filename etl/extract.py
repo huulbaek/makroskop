@@ -25,11 +25,13 @@ import gamspy_base
 
 from catalog import (
     DISPLAY_SCALE, RATIOS, SECTOR_SERIES_TEMPLATES, SECTORS, SERIES, SHOCKS, VARIATIONS, SeriesDef,
+    shock_definition,
 )
 
 YEAR_START = 1985
 YEAR_END = 2100
 YEARS = list(range(YEAR_START, YEAR_END + 1))
+MODEL_HORIZON_END = 2129  # the solver re-solves the model through this year; the app displays to YEAR_END
 
 
 def open_gdx(path: Path) -> gt.Container:
@@ -308,6 +310,7 @@ def main() -> None:
         for suffix, gdx_path in variants:
             print(f"Reading shock {gdx_path.name} ...")
             payload = {"shock": shock_name, "variation": suffix, "synthetic": False,
+                       "definition": shock_definition(shock_name, suffix, MODEL_HORIZON_END),
                        **extract_shock(gdx_path, shock_reference)}
             if reference_path.exists():
                 # solver scenarios fix pre-window years, so the 2022-evaluated HBI is frozen

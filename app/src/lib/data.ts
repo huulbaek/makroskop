@@ -41,12 +41,29 @@ export interface Baseline {
 	indicators: { rHBI: number | null };
 }
 
+/** How the free solver implemented the shock (written by etl/extract.py from catalog.SHOCK_RUNS). */
+export interface ScenarioDefinition {
+	instrument: string;
+	instrumentDa: string;
+	changeDa: string;
+	factor: number;
+	delta: number;
+	firstYear: number;
+	lastYear: number;
+	profileDa: string;
+	closureDa: string;
+	dreamDa: string;
+	seriesKey: string | null;
+	solver: string;
+}
+
 export interface Scenario {
 	shock: string;
 	variation: string;
 	synthetic: boolean;
 	labelDa?: string;
 	hbi: number | null;
+	definition?: ScenarioDefinition | null;
 	deviations: Record<string, (number | null)[]>;
 }
 
