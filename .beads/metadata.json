@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "makroskop",
+  "project_id": "18228e69-0f54-4096-83c6-9d5721c30de2"
+}
