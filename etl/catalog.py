@@ -238,3 +238,11 @@ def shock_definition(shock_name: str, suffix: str, last_year: int) -> dict | Non
         "seriesKey": run.series_key,
         "solver": "MAKROskops frie løser (Newton, fuld horisont)",
     }
+
+
+def etl_gdx_symbols() -> set[str]:
+    """GDX symbols the ETL reads for shock deviations — the minimum a compact export needs."""
+    names = {sdef.gdx_name for sdef in SERIES}
+    names |= {template[0] for template in SECTOR_SERIES_TEMPLATES}
+    names.add("rHBI")
+    return names

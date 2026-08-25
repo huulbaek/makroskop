@@ -46,6 +46,47 @@ Flere stød: kopiér et `solve-export`-kald i `run.sh` og skift `--shock-name`
 (dict-navn), `--shock-years`, `--shock-factor`/`--shock-delta` og `--out`
 (filnavnet skal matche stød-kataloget i `catalog.py`: `<Navn><variant>.gdx`).
 
+## Ny MAKRO-version: grundforløb og scenarier skifter samlet
+
+DREAM udgiver nye versioner 2–4 gange om året (fx 2025-December, 2026-Maj, 2026-June);
+zip'en og `baseline.gdx` ændres sammen, og ligninger/kalibrering kan være ændret. Alle
+scenarier er afvigelser fra *den* versions referenceforløb, så de skal genløses, når
+grundforløbet skifter. Regel: **opdatér aldrig `~/vserver/MAKRO` uden at genløse** —
+og publicér grundforløb + scenarier i ét push.
+
+1. **Lokalt:** `git -C ~/vserver/MAKRO pull` (den uberørte klon). Notér README-titlen og
+   `git rev-parse --short HEAD`. Kør `cloud/pack.sh` — bundtet indeholder den nye zip og
+   baseline.
+2. **På boksen:** udpak i en *ny* mappe (ikke oven i den gamle: `etl/cache/` og
+   `system.npz` hører til den gamle version). `bash cloud/setup.sh` skal slutte med
+   max |res| ~1e-9 — ellers har parseren mødt nye konstruktioner; stop her.
+3. **Ny reference:** `uv run python freesolver.py export-baseline --out shock_gdx/_reference.gdx`.
+   Filen stemples med modellens fingerprint (sha256 af `raw.gms`), som `extract.py`
+   sammenholder med zip'en i MAKRO-klonen.
+4. **Genløs alle scenarier:** `shock_gdx/` skal være tom for gamle filer — `run_batch2.sh`
+   springer eksisterende `.gdx` over. Kør `cloud/run.sh`-scenarierne og
+   `cloud/run_batch2.sh` (gerne med `--export-stages`, se nedenfor). Budget: 2–3 timer pr.
+   stød på en 16-kerners boks, dvs. omkring et døgn for ti stød; prisen er boksens timepris.
+5. **Hjem:** `scp` alle `shock_gdx/*.gdx`, `cd etl && uv run python extract.py`. Outputtet
+   må hverken indeholde `WARNING: ... solved on a different model` eller `assuming ...`
+   (ustemplet fil). `meta.json` og hvert scenaries `modelVersion` skal have samme
+   fingerprint — ellers viser appen en versionsadvarsel.
+6. **Validering:** opdatér tallene i `app/static/data/validation.json` fra `run.log`
+   (fuld-horisont-genfinding), eller lad dem stå med tydelig versionsangivelse.
+7. **Én commit** med data-JSON (+ validering), `git push` → Dokploy bygger og deployer.
+   Footeren viser den nye modelversion.
+
+Kræver *ikke* genløsning: UI-ændringer, katalog-labels, ændringer i `extract.py`
+(sekunder fra de eksisterende GDX-filer), nye stød (kun det nye løses).
+
+### Kontinuationstrin som gratis data
+
+`solve-export --export-stages` skriver hvert konvergeret kontinuationstrin (1 %, 3,5 %,
+9,75 %, … af stødet) som en kompakt `<navn>_sNNN.gdx` (NNN = andel i promille, kun de
+serier ETL'en bruger). `uv run python nonlinearity.py <navn>` sammenligner trinnene med
+den endelige løsning og rapporterer, hvor langt modellen er fra lineær — grundlaget for
+at skalere et løst scenarie i appen (fx +50 bp som halvdelen af +100 bp).
+
 ## Fejlsøgning
 
 - `pypardiso unavailable`: kør videre — SuperLU virker, bare langsommere.

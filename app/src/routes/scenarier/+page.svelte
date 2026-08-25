@@ -92,6 +92,14 @@
 			});
 	});
 
+	/** True when the scenario was solved on a different MAKRO version than the baseline shown. */
+	const versionMismatch = $derived.by(() => {
+		const version = scenario?.modelVersion;
+		if (!version) return false;
+		if (meta.model.fingerprint && version.fingerprint) return version.fingerprint !== meta.model.fingerprint;
+		return version.commit !== meta.model.commit;
+	});
+
 	const fromYear = $derived(meta.defaultShockYear - 1);
 	const toYear = 2060;
 </script>
@@ -193,9 +201,30 @@
 						<dt>Beregnet med</dt>
 						<dd>{def.solver} — <a href="/validering/">se valideringen</a></dd>
 					</div>
+					{#if scenario.modelVersion}
+						<div>
+							<dt>Modelversion</dt>
+							<dd>
+								{scenario.modelVersion.name}
+								<code class="mono">{scenario.modelVersion.commit || scenario.modelVersion.fingerprint}</code>
+								{#if scenario.modelVersion.source === 'assumed'}
+									<span class="muted">(antaget — resultatfilen bærer intet versionsstempel)</span>
+								{/if}
+							</dd>
+						</div>
+					{/if}
 				</dl>
 				<p class="dream-note">{def.dreamDa}</p>
 			</section>
+		{/if}
+
+		{#if scenario && versionMismatch}
+			<div class="banner warn" role="alert">
+				<strong>Versionsforskel.</strong> Scenariet er løst på
+				{scenario.modelVersion?.name} ({scenario.modelVersion?.commit || scenario.modelVersion?.fingerprint}),
+				men grundforløbet her er {meta.model.name} ({meta.model.commit}). Afvigelserne gælder den ældre
+				version og bør genberegnes, før de sammenlignes med grundforløbet.
+			</div>
 		{/if}
 
 		{#if scenario}
@@ -322,6 +351,16 @@
 		background: var(--makro-wash);
 		padding: 1px 5px;
 		border-radius: 3px;
+	}
+
+	.definition .muted {
+		color: var(--ink-muted);
+		font-size: 12px;
+	}
+
+	.banner.warn {
+		border-color: var(--bad);
+		background: color-mix(in srgb, var(--bad) 8%, var(--surface));
 	}
 
 	.dream-note {

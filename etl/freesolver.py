@@ -14,6 +14,8 @@ numbers, xN variable references, and the intrinsics sqr/tanh/exp.
 """
 
 import argparse
+from typing import Callable
+import datetime
 import re
 import time
 from array import array
@@ -491,11 +493,25 @@ def swap_used_gb() -> float:
     return float(used) / 1024
 
 
-def export_solution_gdx(convert_dir: Path, x: np.ndarray, out_path: Path) -> None:
+def model_fingerprint(convert_dir: Path) -> str:
+    """Identity of the solved model: sha256 of raw.gms (the equation source) from the calibration zip.
+
+    extract.py computes the same hash from the zip in the MAKRO repo, so a GDX
+    stamped with this value can be matched to the model version it was solved on.
+    """
+    import hashlib
+    return hashlib.sha256((convert_dir / "raw.gms").read_bytes()).hexdigest()[:12]
+
+
+def export_solution_gdx(convert_dir: Path, x: np.ndarray, out_path: Path,
+                        meta: dict[str, str] | None = None,
+                        symbols: set[str] | None = None) -> None:
     """Write a solved point as a baseline.gdx-style GDX (symbol names + domains from dict.txt).
 
     The last domain column is named 't' when it holds years, matching what the
-    MAKROskop ETL (extract.py read_records) expects.
+    MAKROskop ETL (extract.py read_records) expects. `meta` is written as the set
+    `makroskop_meta` (element -> text), e.g. the model fingerprint; `symbols`
+    restricts the export to those variables (compact continuation-stage files).
     """
     import pandas as pd
     import gams.transfer as gt
@@ -515,10 +531,16 @@ def export_solution_gdx(convert_dir: Path, x: np.ndarray, out_path: Path) -> Non
             if len(parts) < 2 or parts[0][0] != "x" or not parts[0][1:].isdigit():
                 continue
             symbol, _, rest = parts[1].partition("(")
+            if symbols is not None and symbol not in symbols:
+                continue
             keys = rest.rstrip(")").split(",") if rest else []
             records[symbol].append((keys, x[int(parts[0][1:]) - 1]))
 
     container = gt.Container(system_directory=gamspy_base.directory)
+    if meta:
+        gt.Set(container, "makroskop_meta", records=pd.DataFrame(
+            [(key, str(value)) for key, value in meta.items()], columns=["uni", "element_text"]),
+            description="MAKROskop solver stamp: model fingerprint, shock spec, export date")
     written = 0
     for symbol, entries in records.items():
         ndim = len(entries[0][0])
@@ -541,8 +563,13 @@ def export_solution_gdx(convert_dir: Path, x: np.ndarray, out_path: Path) -> Non
 
 def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, int] | None,
                      shock_factor: float, shock_delta: float, out_path: Path,
-                     convert_dir: Path, tol: float) -> None:
-    """Solve a (possibly multi-year) shock with continuation and export the solution as GDX."""
+                     convert_dir: Path, tol: float, export_stages: bool = False) -> None:
+    """Solve a (possibly multi-year) shock with continuation and export the solution as GDX.
+
+    With export_stages, every converged continuation stage (1 %, 3.5 %, ... of the
+    shock) is also written as a compact GDX `<out>_sNNN.gdx` (NNN = share in
+    permille, ETL symbols only) — free data for measuring how linear the response is.
+    """
     system = System()
     window = Window(system, convert_dir, from_year)
     print(f"window: {len(window.eq_sel):,} equations ({window.n_years} years)")
@@ -560,14 +587,32 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
     print(f"shock: {shock_name} x {len(shock_vars)} instances "
           f"(years {shock_years}), factor {shock_factor}, delta {shock_delta}")
 
+    meta = {
+        "fingerprint": model_fingerprint(convert_dir),
+        "solver": "makroskop-freesolver",
+        "shock": shock_name,
+        "shock_years": f"{shock_years[0]}-{shock_years[1]}" if shock_years else "",
+        "factor": repr(shock_factor),
+        "delta": repr(shock_delta),
+        "from_year": str(from_year),
+        "exported": datetime.date.today().isoformat(),
+    }
+
+    def write_stage(share: float, point: np.ndarray) -> None:
+        from catalog import etl_gdx_symbols
+        stage_path = out_path.with_name(f"{out_path.stem}_s{round(share * 1000):03d}.gdx")
+        export_solution_gdx(convert_dir, point, stage_path, meta={**meta, "share": repr(share)},
+                            symbols=etl_gdx_symbols())
+
     x = system.levels.copy()
     checkpoint_path = CACHE_DIR / f"ckpt_{out_path.stem}.npz"
-    solve_shock(system, window, x, shock_vars, targets, tol=tol, checkpoint_path=checkpoint_path)
+    solve_shock(system, window, x, shock_vars, targets, tol=tol, checkpoint_path=checkpoint_path,
+                on_stage=write_stage if export_stages else None)
     residual = np.empty(system.n_eq)
     system.residuals(x, residual)
     print(f"solved: ||r||_inf = {np.abs(residual[window.eq_sel]).max():.3e}")
     print(f"peak RSS this process: {peak_rss_gb():.1f} GB")
-    export_solution_gdx(convert_dir, x, out_path)
+    export_solution_gdx(convert_dir, x, out_path, meta={**meta, "share": "1.0"})
     checkpoint_path.unlink(missing_ok=True)
 
 
@@ -1085,7 +1130,8 @@ def solve_window(system: System, window: Window, x: np.ndarray,
 
 def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.ndarray,
                 target_values: np.ndarray, tol: float = 1e-9,
-                checkpoint_path: Path | None = None) -> float:
+                checkpoint_path: Path | None = None,
+                on_stage: "Callable[[float, np.ndarray], None] | None" = None) -> float:
     """Continuation on shock size: ramp the exogenous variables to their targets.
 
     Mirrors MAKRO's own homotopy trick (solve at 1/100 size, then rescale).
@@ -1122,6 +1168,8 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.nd
             step = min(step * 2.5, 1.0 - solved_share) or step
             if checkpoint_path is not None and solved_share < 1.0:
                 np.savez(checkpoint_path, x=checkpoint, share=solved_share, step=step)
+            if on_stage is not None and solved_share < 1.0 - 1e-12:
+                on_stage(solved_share, checkpoint)
         else:
             step /= 2
             lu = None
@@ -1453,6 +1501,8 @@ def main() -> None:
     parser.add_argument("--tol", type=float, default=1e-9)
     parser.add_argument("--lu-method", default="umfpack")
     parser.add_argument("--from-year", type=int, default=2110)
+    parser.add_argument("--export-stages", action="store_true",
+                        help="solve-export: also write each converged continuation stage as <out>_sNNN.gdx")
     parsed = parser.parse_args()
     if parsed.command == "parse":
         cmd_parse(parsed.convert_dir)
@@ -1472,14 +1522,19 @@ def main() -> None:
                    parsed.convert_dir, parsed.tol, parsed.max_iter, parsed.reuse_gams)
     elif parsed.command == "export-baseline":
         data = np.load(CACHE_DIR / "system.npz")
-        export_solution_gdx(parsed.convert_dir, data["levels"], parsed.out)
+        export_solution_gdx(parsed.convert_dir, data["levels"], parsed.out, meta={
+            "fingerprint": model_fingerprint(parsed.convert_dir),
+            "solver": "makroskop-freesolver", "kind": "reference",
+            "exported": datetime.date.today().isoformat(),
+        })
     elif parsed.command == "solve-export":
         years = None
         if parsed.shock_years:
             lo, _, hi = parsed.shock_years.partition("-")
             years = (int(lo), int(hi or lo))
         cmd_solve_export(parsed.from_year, parsed.shock_name, years, parsed.shock_factor,
-                         parsed.shock_delta, parsed.out, parsed.convert_dir, parsed.tol)
+                         parsed.shock_delta, parsed.out, parsed.convert_dir, parsed.tol,
+                         export_stages=parsed.export_stages)
     else:
         cmd_newton(parsed.perturb, parsed.max_iter, parsed.tol, parsed.from_year, parsed.convert_dir)
 

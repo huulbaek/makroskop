@@ -24,7 +24,7 @@ export interface VariationMeta {
 }
 
 export interface Meta {
-	model: { name: string; commit: string };
+	model: { name: string; commit: string; fingerprint?: string };
 	yearStart: number;
 	yearEnd: number;
 	lastDataYear: number;
@@ -57,6 +57,16 @@ export interface ScenarioDefinition {
 	solver: string;
 }
 
+/** Which MAKRO version a scenario was solved on. `source` is "gdx" when the solver
+ *  stamped the result file, "assumed" when an unstamped file was taken to match the
+ *  MAKRO checkout at extract time. */
+export interface ScenarioModelVersion {
+	name: string;
+	commit: string;
+	fingerprint: string;
+	source: 'gdx' | 'assumed';
+}
+
 export interface Scenario {
 	shock: string;
 	variation: string;
@@ -64,6 +74,7 @@ export interface Scenario {
 	labelDa?: string;
 	hbi: number | null;
 	definition?: ScenarioDefinition | null;
+	modelVersion?: ScenarioModelVersion | null;
 	deviations: Record<string, (number | null)[]>;
 }
 

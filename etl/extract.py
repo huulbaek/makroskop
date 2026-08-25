@@ -15,9 +15,11 @@ reads them.
 """
 
 import argparse
+import hashlib
 import json
 import math
 import subprocess
+import zipfile
 from pathlib import Path
 
 import gams.transfer as gt
@@ -152,6 +154,7 @@ def read_hbi(container: gt.Container) -> float | None:
 def extract_shock(gdx_path: Path, baseline_detrended: dict[str, dict[int, float]]) -> dict:
     """Compute deviation-from-baseline columns for one solved shock GDX."""
     container = open_gdx(gdx_path)
+    solver_meta = read_solver_meta(container)
     deviations: dict[str, list[float | None]] = {}
     shock_detrended: dict[str, dict[int, float]] = {}
     for sdef in all_series_defs():
@@ -178,7 +181,7 @@ def extract_shock(gdx_path: Path, baseline_detrended: dict[str, dict[int, float]
             deviations[key] = to_column({
                 year: (value - base_ratio[year]) * 100 for year, value in shock_ratio.items() if year in base_ratio
             })
-    return {"deviations": deviations, "hbi": read_hbi(container)}
+    return {"deviations": deviations, "hbi": read_hbi(container), "solverMeta": solver_meta}
 
 
 def model_version(makro_root: Path) -> dict[str, str]:
@@ -187,7 +190,42 @@ def model_version(makro_root: Path) -> dict[str, str]:
         ["git", "-C", str(makro_root), "rev-parse", "--short", "HEAD"],
         capture_output=True, text=True, check=False,
     ).stdout.strip()
-    return {"name": readme_first_line.lstrip("# ").strip(), "commit": commit}
+    return {"name": readme_first_line.lstrip("# ").strip(), "commit": commit,
+            "fingerprint": model_fingerprint(makro_root)}
+
+
+def model_fingerprint(makro_root: Path) -> str:
+    """sha256 of raw.gms inside the calibration zip — the same stamp freesolver writes into its GDX files."""
+    zip_path = makro_root / "Model/deep_dynamic_calibration.zip"
+    if not zip_path.exists():
+        return ""
+    with zipfile.ZipFile(zip_path) as archive:
+        return hashlib.sha256(archive.read("raw.gms")).hexdigest()[:12]
+
+
+def read_solver_meta(container: gt.Container) -> dict[str, str]:
+    """The `makroskop_meta` stamp freesolver writes (fingerprint, shock spec, date), or {}."""
+    if "makroskop_meta" not in container.data:
+        return {}
+    records = container.data["makroskop_meta"].records
+    if records is None:
+        return {}
+    return {str(row.iloc[0]): str(row.iloc[1]) for _, row in records.iterrows()}
+
+
+def scenario_model_version(solver_meta: dict[str, str], current: dict[str, str]) -> dict[str, str]:
+    """Which MAKRO version a scenario GDX was solved on.
+
+    A stamped file whose fingerprint matches the current MAKRO checkout gets that
+    checkout's name/commit; a stamped file with a different fingerprint is reported
+    as unknown-but-different (the app warns); an unstamped file is *assumed* to match.
+    """
+    stamped = solver_meta.get("fingerprint", "")
+    if stamped and stamped == current["fingerprint"]:
+        return {**current, "source": "gdx"}
+    if stamped:
+        return {"name": "anden MAKRO-version", "commit": "", "fingerprint": stamped, "source": "gdx"}
+    return {**current, "source": "assumed"}
 
 
 def sector_labels(container: gt.Container) -> dict[str, str]:
@@ -304,6 +342,7 @@ def main() -> None:
     )
     print(f"  wrote baseline.json ({len(columns)} series)")
 
+    current_version = model_version(args.makro_root)
     found = scan_shock_gdx_files(args.shocks_dir)
     available: dict[str, list[str]] = {}
     for shock_name, variants in found.items():
@@ -312,6 +351,12 @@ def main() -> None:
             payload = {"shock": shock_name, "variation": suffix, "synthetic": False,
                        "definition": shock_definition(shock_name, suffix, MODEL_HORIZON_END),
                        **extract_shock(gdx_path, shock_reference)}
+            payload["modelVersion"] = scenario_model_version(payload.pop("solverMeta"), current_version)
+            if payload["modelVersion"]["source"] == "assumed":
+                print(f"  note: {gdx_path.name} carries no solver stamp; assuming {current_version['name']}")
+            elif payload["modelVersion"]["fingerprint"] != current_version["fingerprint"]:
+                print(f"  WARNING: {gdx_path.name} was solved on a different model "
+                      f"(fingerprint {payload['modelVersion']['fingerprint']} != {current_version['fingerprint']})")
             if reference_path.exists():
                 # solver scenarios fix pre-window years, so the 2022-evaluated HBI is frozen
                 payload["hbi"] = None
