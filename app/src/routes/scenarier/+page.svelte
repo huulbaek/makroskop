@@ -3,6 +3,8 @@
 	import StatTile from '$lib/components/StatTile.svelte';
 	import { formatSigned } from '$lib/format';
 	import { loadScenario, type Scenario, type ShockMeta } from '$lib/data';
+	import { page } from '$app/state';
+	import { onMount } from 'svelte';
 
 	let { data } = $props();
 
@@ -48,6 +50,18 @@
 		override = await loadScenario(fetch, `${name}${variation}`);
 		loading = false;
 	}
+
+	// Deep link: /scenarier/?stod=Rente&variant=_ufin (used from the validation page)
+	onMount(() => {
+		const name = page.url.searchParams.get('stod');
+		const shock = name ? meta.shocks.find((s) => s.name === name) : undefined;
+		if (!shock) return;
+		const wanted = page.url.searchParams.get('variant') ?? '';
+		const variation = shock.available.includes(wanted)
+			? wanted
+			: (shock.available[0] ?? meta.variations[1]?.suffix ?? '_midl');
+		void select(shock.name, variation);
+	});
 
 	const chartKeys = [
 		'qBNP', 'nL', 'ledighedsgrad',

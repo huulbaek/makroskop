@@ -4,17 +4,83 @@
 	let { data } = $props();
 
 	const validation = $derived(data.validation);
+	const full = $derived(validation.fullHorizon);
+	const solve = $derived(validation.scenario);
+	const scenario = $derived(data.scenario);
 	const flagship = $derived(validation.oracles.find((o) => o.flagship));
 	const others = $derived(validation.oracles.filter((o) => !o.flagship));
 
 	const daInt = new Intl.NumberFormat('da-DK');
+	const daSigned = new Intl.NumberFormat('da-DK', {
+		minimumFractionDigits: 1,
+		maximumFractionDigits: 1,
+		signDisplay: 'always'
+	});
+	const daOne = new Intl.NumberFormat('da-DK', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+	const daTwo = new Intl.NumberFormat('da-DK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-	/** "1,1 × 10⁻¹⁵"-style scientific notation parts. */
-	function sci(value: number): { mantissa: string; exponent: number } {
-		if (value === 0) return { mantissa: '0', exponent: 0 };
+	/** "1,1 × 10⁻¹⁵"-style scientific notation as HTML. */
+	function sci(value: number): string {
+		if (value === 0) return '0';
 		const exponent = Math.floor(Math.log10(Math.abs(value)));
-		const mantissa = value / Math.pow(10, exponent);
-		return { mantissa: mantissa.toFixed(1).replace('.', ','), exponent };
+		const mantissa = (value / Math.pow(10, exponent)).toFixed(1).replace('.', ',');
+		return `${mantissa} × 10<sup>${exponent}</sup>`;
+	}
+
+	/** Deviation of one series in a given year (null when the scenario is not ingested). */
+	function at(key: string, year: number): number | null {
+		const series = scenario?.deviations[key];
+		if (!series) return null;
+		const index = data.years.indexOf(year);
+		return index >= 0 ? (series[index] ?? null) : null;
+	}
+
+	/** Most negative value of a series and the year it occurs. */
+	function trough(key: string): { value: number; year: number } | null {
+		const series = scenario?.deviations[key];
+		if (!series) return null;
+		let best: { value: number; year: number } | null = null;
+		series.forEach((value, index) => {
+			if (value !== null && (best === null || value < best.value)) best = { value, year: data.years[index] };
+		});
+		return best;
+	}
+
+	/** First year after `from` where |deviation| stays below `tolerance`. */
+	function settles(key: string, from: number, tolerance: number): number | null {
+		const series = scenario?.deviations[key];
+		if (!series) return null;
+		for (let index = 0; index < series.length; index++) {
+			const value = series[index];
+			if (data.years[index] > from && value !== null && Math.abs(value) < tolerance) return data.years[index];
+		}
+		return null;
+	}
+
+	const story = $derived.by(() => {
+		if (!scenario) return null;
+		const gdpTrough = trough('qBNP');
+		const jobsTrough = trough('nL');
+		return {
+			gdp2030: at('qBNP', 2030),
+			gdpTrough,
+			gdp2100: at('qBNP', 2100),
+			jobsTrough,
+			jobsBack: settles('nL', 2030, 0.05),
+			houses2030: at('pBolig', 2030),
+			houses2050: at('pBolig', 2050),
+			wages: trough('vhW'),
+			balance2030: at('saldo2bnp', 2030),
+			balance2050: at('saldo2bnp', 2050)
+		};
+	});
+
+	function pct(value: number | null | undefined): string {
+		return value === null || value === undefined ? '–' : `${daSigned.format(value)} pct.`;
+	}
+
+	function pp(value: number | null | undefined): string {
+		return value === null || value === undefined ? '–' : `${daSigned.format(value)} pct.-point`;
 	}
 </script>
 
@@ -26,10 +92,12 @@
 	<p class="eyebrow">Uafhængig kontrol · {validation.model.name}</p>
 	<h1>Kan man stole på tallene?</h1>
 	<p class="lede">
-		MAKROskops frie beregningsmotor løser MAKROs ligninger uden kommerciel software. For at
-		efterprøve den har vi løst <em>præcis de samme stød-scenarier</em> med to uafhængige værktøjer:
-		den officielle GAMS-platform (solveren IPOPT) og vores egen frie Newton-løser. Hvis begge
-		regner rigtigt, skal de nå frem til samme svar — og det gør de.
+		MAKROskops frie beregningsmotor løser MAKROs ligninger uden kommerciel software. Vi har
+		efterprøvet den på to måder: ved at løse <em>præcis de samme stød-scenarier</em> med den
+		officielle GAMS-platform (solveren IPOPT) og med vores egen frie Newton-løser — og ved at
+		lade den frie løser genfinde modellens egen løsning for <em>alle
+		{daInt.format(full.equations)} ligninger</em> over hele horisonten. Begge prøver bestås til
+		maskinpræcision.
 	</p>
 </section>
 
@@ -41,9 +109,9 @@
 		tone="good"
 	/>
 	<StatTile
-		label="Ligninger i testsystemet"
-		value={daInt.format(validation.system.windowEquations)}
-		note="10-års udsnit ({validation.system.windowYears}) af MAKROs {daInt.format(validation.system.fullEquations)} ligninger"
+		label="Ligninger løst i fuld skala"
+		value={daInt.format(full.equations)}
+		note="hele horisonten {full.years} på én lejet server"
 	/>
 	<StatTile
 		label="Variable der reagerede på rentestødet"
@@ -65,45 +133,187 @@
 			<strong>Samme ligninger.</strong> MAKRO-repositoriet indeholder hele modellen i udfoldet form
 			({daInt.format(validation.system.fullEquations)} ligninger). Vores motor genlæser dem tegn for
 			tegn; ved modellens egen løsning er den største ligningsfejl
-			{@html `${sci(validation.system.maxResidualAtSolution).mantissa} × 10<sup>${sci(validation.system.maxResidualAtSolution).exponent}</sup>`}
-			— ren afrundingsstøj.
+			{@html sci(validation.system.maxResidualAtSolution)} — ren afrundingsstøj.
 		</li>
 		<li>
 			<strong>Samme stød, to løsere.</strong> Et veldefineret stød (fx renten +1 pct.-point i 2124)
 			lægges ind i begge systemer. GAMS/IPOPT kører under en gyldig licens; den frie løser bruger
-			kun open source-komponenter.
+			kun open source-komponenter. Alle {daInt.format(validation.system.windowEquations)} ubekendte i
+			et 10-års udsnit sammenlignes variabel for variabel — både niveauer og selve stød-effekterne.
 		</li>
 		<li>
-			<strong>Sammenlign alt.</strong> Alle {daInt.format(validation.system.windowEquations)}
-			ubekendte sammenlignes variabel for variabel — både niveauer og selve stød-effekterne
-			(afvigelsen fra grundforløbet, det tal en artikel ville citere).
+			<strong>Fuld skala.</strong> På en lejet server med 64 GB hukommelse forstyrres alle
+			{daInt.format(full.equations)} variable i hele modellen tilfældigt, og den frie løser skal finde
+			tilbage til modellens egen løsning. Derefter løses det første rigtige scenarie over hele
+			horisonten.
 		</li>
 	</ol>
 </section>
 
+<section class="card flagship">
+	<h2>Hele modellen, hele horisonten</h2>
+	<p class="shock-spec mono">
+		{daInt.format(full.equations)} ligninger · {full.yearCount} år ({full.years}) · {full.machine}
+	</p>
+	<div class="result-grid">
+		<div>
+			<table class="results">
+				<caption>Genfinder modellens egen løsning efter tilfældig forstyrrelse</caption>
+				<tbody>
+					<tr>
+						<th>Forstyrrelse af alle variable</th>
+						<td>±{daTwo.format(full.perturbation * 100)} pct. relativt</td>
+					</tr>
+					<tr>
+						<th>Slutresidual, ‖fejl‖<sub>∞</sub></th>
+						<td>{@html sci(full.finalResidual)}</td>
+					</tr>
+					<tr>
+						<th>Median-afvigelse fra CONOPTs original</th>
+						<td>{@html sci(full.medianRecovery)}</td>
+					</tr>
+					<tr>
+						<th>Størst afvigelse (enkelte NPV-variable)</th>
+						<td>{@html sci(full.maxRelDev)}</td>
+					</tr>
+					<tr>
+						<th>Én faktorisering, UMFPACK</th>
+						<td>{daInt.format(Math.round(full.factorSecondsUmfpack))} s</td>
+					</tr>
+					<tr>
+						<th>Newton-iterationer</th>
+						<td>{full.iterations.length - 1}</td>
+					</tr>
+				</tbody>
+			</table>
+			<p class="footnote">
+				Lineære systemer løses af {validation.solver.linear}. Hver faktorisering efterprøves mod en
+				kendt højreside, før den bruges; i denne kørsel blev Pardiso afvist ved iteration 4 og
+				UMFPACK tog over — kæden er designet, så en tvivlsom faktorisering aldrig kommer igennem.
+				Desuden: {validation.solver.refinement}.
+			</p>
+		</div>
+		<div class="trace">
+			<h3>Newton på {daInt.format(full.equations)} ligninger</h3>
+			<p class="trace-note">
+				Fejlen falder fra {@html sci(full.iterations[0])} til {@html sci(full.finalResidual)} på
+				{full.iterations.length - 1} iterationer — samme kvadratiske signatur som i det lille udsnit.
+			</p>
+			<table class="results mono-table">
+				<thead><tr><th>Iteration</th><th>‖fejl‖<sub>∞</sub></th></tr></thead>
+				<tbody>
+					{#each full.iterations as residual, i (i)}
+						<tr>
+							<td>{i === 0 ? 'start' : i}</td>
+							<td>{@html sci(residual)}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	</div>
+</section>
+
+<section class="card scenario">
+	<h2>Det første rigtige scenarie: {solve.labelDa}</h2>
+	<p class="shock-spec mono">{solve.shock}</p>
+	<div class="result-grid">
+		<div>
+			{#if story}
+				<p class="story">
+					En permanent forhøjelse af ECB-renten med ét procentpoint fra 2030 lægger BNP
+					<strong>{pct(story.gdp2030)}</strong> under grundforløbet det første år og
+					<strong>{pct(story.gdpTrough?.value)}</strong> på det dybeste ({story.gdpTrough?.year});
+					i 2100 er afvigelsen {pct(story.gdp2100)}. Beskæftigelsen ligger
+					<strong>{pct(story.jobsTrough?.value)}</strong> i {story.jobsTrough?.year} og er
+					{#if story.jobsBack}tilbage ved udgangspunktet i {story.jobsBack}{:else}derefter
+					stort set uændret{/if}
+					— det klassiske V, fordi lønnen tilpasser sig ({pct(story.wages?.value)} på det laveste).
+					Boligpriserne tager det største slag: <strong>{pct(story.houses2030)}</strong> i 2030,
+					stadig {pct(story.houses2050)} i 2050. Den offentlige saldo svækkes med
+					<strong>{pp(story.balance2030)}</strong> af BNP i 2030, men vender til
+					{pp(story.balance2050)} i 2050 — stødet er ufinansieret, så ingen skattesats reagerer, og
+					rentevirkningen på de offentlige finanser akkumulerer over tid.
+				</p>
+				<p class="footnote">
+					Størrelsesordenerne svarer til DREAMs egne publicerede rentestød. Alle kurver kan
+					udforskes under <a href="/scenarier/?stod=Rente&variant=_ufin">Scenarier</a>.
+				</p>
+			{:else}
+				<p class="story">
+					Scenariet er løst, men datafilen <code>Rente_ufin.json</code> er ikke indlæst i denne
+					udgave af MAKROskop.
+				</p>
+			{/if}
+		</div>
+		<div>
+			<table class="results">
+				<caption>Sådan blev det løst</caption>
+				<tbody>
+					<tr>
+						<th>Ligninger i løsningsvinduet</th>
+						<td>{daInt.format(solve.windowEquations)} ({solve.windowYears})</td>
+					</tr>
+					<tr>
+						<th>Kontinuationstrin</th>
+						<td>{solve.stagesConverged} konvergerede · {solve.stagesRejected} afvist og halveret</td>
+					</tr>
+					<tr>
+						<th>Faktoriseringer (UMFPACK)</th>
+						<td>{solve.freshFactorizations} · {daOne.format(solve.factorHours)} timer</td>
+					</tr>
+					<tr>
+						<th>Slutresidual, ‖fejl‖<sub>∞</sub></th>
+						<td>{@html sci(solve.finalResidual)}</td>
+					</tr>
+				</tbody>
+			</table>
+			<div class="trace">
+				<h3>{solve.lastStageLabelDa}</h3>
+				<table class="results mono-table">
+					<thead><tr><th>Iteration</th><th>‖fejl‖<sub>∞</sub></th></tr></thead>
+					<tbody>
+						{#each solve.lastStageIterations as residual, i (i)}
+							<tr>
+								<td>{i === 0 ? 'start' : i}</td>
+								<td>{@html sci(residual)}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+				<p class="trace-note">
+					Iteration 1–2 lader fejlen eksplodere: det er langsigtede nutidsværdi-variable, der
+					lægger sig til rette efter et fuldt Newton-skridt. Løseren accepterer det bevidst
+					(ikke-monoton linjesøgning) og lander derefter på maskinpræcision.
+				</p>
+			</div>
+		</div>
+	</div>
+</section>
+
 {#if flagship}
-	<section class="card flagship">
-		<h2>{flagship.labelDa}</h2>
-		<p class="shock-spec mono">{flagship.shock}</p>
+	<section class="card oracle">
+		<h2>To løsere, samme svar: {flagship.labelDa}</h2>
+		<p class="shock-spec mono">{flagship.shock} · 10-års udsnit {validation.system.windowYears}</p>
 		<div class="result-grid">
 			<table class="results">
 				<caption>Uenighed mellem løserne, {daInt.format(validation.system.windowEquations)} variable</caption>
 				<tbody>
 					<tr>
 						<th>Median (relativt)</th>
-						<td>{@html `${sci(flagship.medianRel).mantissa} × 10<sup>${sci(flagship.medianRel).exponent}</sup>`}</td>
+						<td>{@html sci(flagship.medianRel)}</td>
 					</tr>
 					<tr>
 						<th>99,9-percentil</th>
-						<td>{@html `${sci(flagship.p999Rel).mantissa} × 10<sup>${sci(flagship.p999Rel).exponent}</sup>`}</td>
+						<td>{@html sci(flagship.p999Rel)}</td>
 					</tr>
 					<tr>
 						<th>Størst (IPOPTs egen tolerance)</th>
-						<td>{@html `${sci(flagship.maxRel).mantissa} × 10<sup>${sci(flagship.maxRel).exponent}</sup>`}</td>
+						<td>{@html sci(flagship.maxRel)}</td>
 					</tr>
 					<tr>
 						<th>Stød-effekter, median-afvigelse</th>
-						<td>{@html `${sci(flagship.irfMedian ?? 0).mantissa} × 10<sup>${sci(flagship.irfMedian ?? 0).exponent}</sup>`} af effekten</td>
+						<td>{@html sci(flagship.irfMedian ?? 0)} af effekten</td>
 					</tr>
 					<tr>
 						<th>GAMS/IPOPT</th>
@@ -111,7 +321,7 @@
 					</tr>
 					<tr>
 						<th>Fri løser, slutresidual</th>
-						<td>{@html `${sci(flagship.free.finalResidual).mantissa} × 10<sup>${sci(flagship.free.finalResidual).exponent}</sup>`}</td>
+						<td>{@html sci(flagship.free.finalResidual)}</td>
 					</tr>
 				</tbody>
 			</table>
@@ -129,7 +339,7 @@
 							{#each flagship.trace.iterations as residual, i (i)}
 								<tr>
 									<td>{i === 0 ? 'start' : i}</td>
-									<td>{@html `${sci(residual).mantissa} × 10<sup>${sci(residual).exponent}</sup>`}</td>
+									<td>{@html sci(residual)}</td>
 								</tr>
 							{/each}
 						</tbody>
@@ -149,11 +359,11 @@
 				<tbody>
 					<tr>
 						<th>Median-uenighed</th>
-						<td>{@html `${sci(oracle.medianRel).mantissa} × 10<sup>${sci(oracle.medianRel).exponent}</sup>`}</td>
+						<td>{@html sci(oracle.medianRel)}</td>
 					</tr>
 					<tr>
 						<th>99,9-percentil</th>
-						<td>{@html `${sci(oracle.p999Rel).mantissa} × 10<sup>${sci(oracle.p999Rel).exponent}</sup>`}</td>
+						<td>{@html sci(oracle.p999Rel)}</td>
 					</tr>
 					<tr>
 						<th>Fri løser</th>
@@ -166,10 +376,10 @@
 	{/each}
 
 	<section class="card">
-		<h2 class="minor-title">Genfinder modellens egen løsning</h2>
+		<h2 class="minor-title">Genfinder løsningen i udsnittet</h2>
 		<p class="shock-spec">
-			Alle {daInt.format(validation.system.windowEquations)} variable forstyrres tilfældigt; Newton
-			skal finde tilbage.
+			Alle {daInt.format(validation.system.windowEquations)} variable forstyrres tilfældigt på en
+			bærbar; Newton skal finde tilbage.
 		</p>
 		<table class="results mono-table">
 			<thead><tr><th>Iteration</th><th>‖fejl‖<sub>∞</sub></th></tr></thead>
@@ -177,15 +387,14 @@
 				{#each validation.recovery.iterations as residual, i (i)}
 					<tr>
 						<td>{i === 0 ? 'start' : i}</td>
-						<td>{@html `${sci(residual).mantissa} × 10<sup>${sci(residual).exponent}</sup>`}</td>
+						<td>{@html sci(residual)}</td>
 					</tr>
 				{/each}
 			</tbody>
 		</table>
 		<p class="footnote">
-			Løsningen genfindes med median-afvigelse
-			{@html `${sci(validation.recovery.medianRecovery).mantissa} × 10<sup>${sci(validation.recovery.medianRecovery).exponent}</sup>`}
-			fra CONOPTs original.
+			Løsningen genfindes med median-afvigelse {@html sci(validation.recovery.medianRecovery)} fra
+			CONOPTs original.
 		</p>
 	</section>
 </div>
@@ -194,21 +403,26 @@
 	<h2>Forbehold — læs dem</h2>
 	<ul>
 		<li>
-			Testene er kørt på et 10-års udsnit af modellen ({validation.system.windowYears}), fordi
-			testmaskinen er en almindelig bærbar ({validation.machine}). Fuldt 100-års horisont kræver
-			mere hukommelse og er næste skridt.
+			Krydstjekket mod GAMS/IPOPT er kørt på et 10-års udsnit ({validation.system.windowYears}) på
+			en almindelig bærbar. I fuld skala har vi kun den frie løsers egen kontrol (genfinding af
+			modellens løsning til {@html sci(full.medianRecovery)}); en GAMS-løsning af samme
+			fuld-horisont-scenarie kræver licens og mange timer og er ikke gjort.
 		</li>
 		<li>
-			Stødene er matematiske testscenarier — ikke DREAMs officielle standardstød. Sammenligning mod
-			DREAMs publicerede stød-rapporter kommer, når fuld horisont er på plads.
+			Rentescenariet er et rigtigt scenarie, men afvigelserne måles mod modellens
+			kalibreringsforløb — ikke DREAMs officielle grundforløb, som ikke kan genskabes uden
+			licenseret software. Til marginale eksperimenter gør det ingen forskel; tallene bør
+			ikke citeres som "Finansministeriets".
 		</li>
 		<li>
-			Kolonnen "størst" afspejler IPOPTs stop-tolerance, ikke den frie løsers præcision; den frie
-			løsers egne residualer er 100-1000 gange strammere.
+			Kolonnen "størst" i to-løser-testen afspejler IPOPTs stop-tolerance, ikke den frie løsers
+			præcision; den frie løsers egne residualer er 100-1000 gange strammere. I fuld skala er
+			de største afvigelser nutidsværdi-variable langt ude i horisonten, som er dårligt bestemte
+			i selve modellen.
 		</li>
 		<li>
-			Alt kan efterprøves: koden er open source, og MAKRO-modellen er MIT-licenseret. Reproduktion:
-			<code>{validation.reproduce}</code>.
+			Maskiner: {validation.machine}. Alt kan efterprøves: koden er open source, og MAKRO-modellen
+			er MIT-licenseret. Reproduktion: <code>{validation.reproduce}</code>.
 		</li>
 	</ul>
 </section>
@@ -272,6 +486,22 @@
 
 	.flagship {
 		border-color: var(--makro);
+	}
+
+	.scenario {
+		border-color: var(--series-1);
+	}
+
+	.story {
+		font-size: 14.5px;
+		color: var(--ink-secondary);
+		margin: 0;
+		line-height: 1.6;
+	}
+
+	.story strong {
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.shock-spec {
@@ -340,10 +570,18 @@
 		margin-bottom: 4px;
 	}
 
+	.scenario .trace {
+		margin-top: 14px;
+	}
+
 	.trace-note {
 		font-size: 12px;
 		color: var(--ink-muted);
 		margin: 0 0 8px;
+	}
+
+	.trace .mono-table + .trace-note {
+		margin: 8px 0 0;
 	}
 
 	.minor-grid {
