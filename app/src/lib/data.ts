@@ -55,6 +55,7 @@ export interface ScenarioDefinition {
 	dreamDa: string;
 	seriesKey: string | null;
 	solver: string;
+	linearityDa: string;
 }
 
 /** Which MAKRO version a scenario was solved on. `source` is "gdx" when the solver

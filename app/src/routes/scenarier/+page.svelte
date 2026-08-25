@@ -20,6 +20,10 @@
 
 	let selectedName = $state('_demo');
 	let selectedVariation = $state('');
+	/** Client-side linear rescaling of a solved scenario (1 = as solved). */
+	let scale = $state(1);
+	const SCALE_STEPS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+	const daScale = new Intl.NumberFormat('da-DK', { maximumFractionDigits: 2 });
 	let override: Scenario | null | 'unset' = $state.raw('unset');
 	let loading = $state(false);
 	const scenario = $derived(override === 'unset' ? data.initialScenario : override);
@@ -41,6 +45,7 @@
 	async function select(name: string, variation: string) {
 		selectedName = name;
 		selectedVariation = variation;
+		scale = 1;
 		const shock = name === '_demo' ? DEMO : meta.shocks.find((s) => s.name === name);
 		if (!shock || !shock.available.includes(variation)) {
 			override = null;
@@ -60,7 +65,10 @@
 		const variation = shock.available.includes(wanted)
 			? wanted
 			: (shock.available[0] ?? meta.variations[1]?.suffix ?? '_midl');
-		void select(shock.name, variation);
+		const wantedScale = Number(page.url.searchParams.get('skala'));
+		void select(shock.name, variation).then(() => {
+			if (SCALE_STEPS.includes(wantedScale)) scale = wantedScale;
+		});
 	});
 
 	const chartKeys = [
@@ -87,9 +95,20 @@
 					isInstrument: key === instrument,
 					unit: pct ? 'afvigelse fra grundforløb, pct.' : 'afvigelse, pct.-point',
 					suffix: pct ? ' pct.' : ' pct.-point',
-					values: scenario!.deviations[key]
+					values:
+						scale === 1
+							? scenario!.deviations[key]
+							: scenario!.deviations[key].map((v) => (v == null ? null : v * scale))
 				};
 			});
+	});
+
+	/** The shock size implied by the slider, in the instrument's own units. */
+	const scaledChange = $derived.by(() => {
+		const def = scenario?.definition;
+		if (!def) return '';
+		if (def.delta !== 0) return `${formatSigned(def.delta * 100 * scale)} pct.-point`;
+		return `${formatSigned((def.factor - 1) * 100 * scale)} pct.`;
 	});
 
 	/** True when the scenario was solved on a different MAKRO version than the baseline shown. */
@@ -215,6 +234,29 @@
 					{/if}
 				</dl>
 				<p class="dream-note">{def.dreamDa}</p>
+				{#if !scenario.synthetic}
+					<div class="scaler">
+						<label for="scale">Prøv en anden størrelse</label>
+						<input
+							id="scale"
+							type="range"
+							min="0"
+							max={SCALE_STEPS.length - 1}
+							step="1"
+							value={SCALE_STEPS.indexOf(scale)}
+							oninput={(e) => (scale = SCALE_STEPS[Number(e.currentTarget.value)])}
+							aria-valuetext={`${daScale.format(scale)} gange stødet`}
+						/>
+						<output for="scale" class="scale-readout">
+							<strong>×{daScale.format(scale)}</strong> = {scaledChange}
+							{#if scale !== 1}<span class="approx">lineær tilnærmelse</span>{/if}
+						</output>
+						<p class="scale-note">
+							Kurverne skaleres i browseren — det er <em>ikke</em> en ny modelkørsel. Modellen er
+							tæt på lineær for stød af denne størrelse, men ikke helt: {def.linearityDa}
+						</p>
+					</div>
+				{/if}
 			</section>
 		{/if}
 
@@ -243,6 +285,7 @@
 					<div class="card chart-card" class:instrument={chart.isInstrument}>
 						{#if scenario.synthetic}<span class="demo-badge" aria-hidden="true">DEMO</span>{/if}
 						{#if chart.isInstrument}<span class="instrument-badge">Stødet (input)</span>{/if}
+						{#if scale !== 1 && !chart.isInstrument}<span class="scaled-badge">×{daScale.format(scale)} tilnærmet</span>{/if}
 						<LineChart
 							title={chart.title}
 							code={chart.key}
@@ -368,6 +411,68 @@
 		color: var(--ink-muted);
 		margin: 10px 0 0;
 		max-width: 80ch;
+	}
+
+	.scaler {
+		margin-top: 12px;
+		padding-top: 12px;
+		border-top: 1px solid var(--grid);
+		display: grid;
+		grid-template-columns: max-content 1fr max-content;
+		gap: 4px 14px;
+		align-items: center;
+		font-size: 13px;
+	}
+
+	.scaler label {
+		color: var(--ink-secondary);
+	}
+
+	.scaler input[type='range'] {
+		width: 100%;
+		accent-color: var(--makro);
+	}
+
+	.scale-readout {
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+
+	.scale-readout .approx {
+		margin-left: 6px;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--series-2);
+	}
+
+	.scale-note {
+		grid-column: 1 / -1;
+		margin: 4px 0 0;
+		font-size: 12px;
+		color: var(--ink-muted);
+		max-width: 80ch;
+	}
+
+	.scaled-badge {
+		position: absolute;
+		top: 8px;
+		right: 10px;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--series-2);
+		background: color-mix(in srgb, var(--series-2) 10%, var(--surface));
+		padding: 2px 6px;
+		border-radius: 3px;
+	}
+
+	@media (max-width: 520px) {
+		.scaler {
+			grid-template-columns: 1fr;
+		}
 	}
 
 	.chart-card.instrument {

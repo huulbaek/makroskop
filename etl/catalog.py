@@ -169,6 +169,7 @@ class ShockRun:
     first_year: int
     dream_da: str
     series_key: str | None = None  # SERIES key of the instrument, if it is a catalog series
+    linearity_da: str | None = None  # measured nonlinearity (nonlinearity.py), if known
 
 
 _DREAM_GDP_NORM = (
@@ -184,7 +185,10 @@ SHOCK_RUNS: list[ShockRun] = [
              "Alle danske renter i MAKRO er bygget oven på ECB-renten (obligations-, bank- og "
              "virksomhedernes afkastkrav), så gennemslaget er 1:1; udenlandske priser er uændrede, "
              "så det er reelt en permanent højere realrente.",
-             series_key="rRenteECB"),
+             series_key="rRenteECB",
+             linearity_da="Målt på et 10-års udsnit: ved 64 pct. af stødet afviger modellen 1,1 pct. "
+                          "(median) fra lineær skalering; BNP 0,8 pct., beskæftigelse 0,9 pct., "
+                          "boligpriser 1,8 pct., enkelte branche-serier op til 6 pct. af effekten."),
     ShockRun("Oliepris", "pOlieBrent", "Prisnotering på råolie, Brent", 1.10, 0.0, "+10 pct.", 2030,
              "Samme størrelse som DREAMs standardstød. I kalibrerings-konfigurationen er de udenlandske "
              "priskanaler faste input, så stødet forplanter sig kun til få variable."),
@@ -237,6 +241,7 @@ def shock_definition(shock_name: str, suffix: str, last_year: int) -> dict | Non
         "dreamDa": run.dream_da,
         "seriesKey": run.series_key,
         "solver": "MAKROskops frie løser (Newton, fuld horisont)",
+        "linearityDa": run.linearity_da or "Lineariteten er ikke målt for dette stød endnu.",
     }
 
 
