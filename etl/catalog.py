@@ -190,8 +190,21 @@ SHOCK_RUNS: list[ShockRun] = [
                           "(median) fra lineær skalering; BNP 0,8 pct., beskæftigelse 0,9 pct., "
                           "boligpriser 1,8 pct., enkelte branche-serier op til 6 pct. af effekten."),
     ShockRun("Oliepris", "pOlieBrent", "Prisnotering på råolie, Brent", 1.10, 0.0, "+10 pct.", 2030,
-             "Samme størrelse som DREAMs standardstød. I kalibrerings-konfigurationen er de udenlandske "
-             "priskanaler faste input, så stødet forplanter sig kun til få variable."),
+             "Samme instrument og størrelse som DREAMs standardstød. I kalibrerings-konfigurationen "
+             "driver Brent-prisen kun oliepris-indekset pOlie, mens de import- og energipriser, det "
+             "skulle slå igennem på, er faste datainput — så stødet bider næsten ikke. Brug "
+             "\"Udenlandske priser\" eller \"Importpriser\" for et prisstød, der virker.",
+             series_key="pOlie"),
+    ShockRun("Udenlandske_priser", "pM, pXUdl", "Importpriser (alle varegrupper) og eksportkonkurrerende priser",
+             1.01, 0.0, "+1 pct.", 2030,
+             "Samme bundt og størrelse som DREAMs standardstød \"Udenlandske_priser\": alle eksogene "
+             "importpriser pM[s] og udenlandske konkurrentpriser pXUdl[x] hæves 1 pct.; aggregaterne "
+             "er endogene og følger med."),
+    ShockRun("Importpris", "pM", "Importpriser (alle varegrupper)", 1.01, 0.0, "+1 pct.", 2030,
+             "Samme instrument og størrelse som DREAMs standardstød \"Importpris\"."),
+    ShockRun("Eksportkonkurrerende_priser", "pXUdl", "Udenlandske konkurrentpriser på eksportmarkederne",
+             1.01, 0.0, "+1 pct.", 2030,
+             "Samme instrument og størrelse som DREAMs standardstød \"Eksportkonkurrerende_priser\"."),
     ShockRun("Bundskat", "tBund", "Bundskattesats", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM),
     ShockRun("AM_bidrag", "tAMbidrag", "Arbejdsmarkedsbidrag, sats", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM),
     ShockRun("Selskabsskat", "tSelskab", "Selskabsskattesats", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM),

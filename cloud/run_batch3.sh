@@ -30,5 +30,10 @@ run Bundskat_midl.gdx           --shock-name tBund     --shock-years 2030-2129 -
 run Offentligt_forbrug_midl.gdx --shock-name uG        --shock-years 2030-2129 --shock-factor 1.01 --shock-profile ar
 run Offentligt_forbrug_blip.gdx --shock-name uG        --shock-years 2030-2129 --shock-factor 1.01 --shock-profile blip
 
+# Foreign-price shocks (bundles): the price shock that actually bites in this configuration.
+run Udenlandske_priser_ufin.gdx         --shock-name pM,pXUdl --shock-years 2030-2129 --shock-factor 1.01
+run Importpris_ufin.gdx                 --shock-name pM       --shock-years 2030-2129 --shock-factor 1.01
+run Eksportkonkurrerende_priser_ufin.gdx --shock-name pXUdl   --shock-years 2030-2129 --shock-factor 1.01
+
 echo "BATCH 3 DONE — fetch with:"
 echo "  scp 'root@<box>:makroskop-cloud/etl/shock_gdx/*.gdx' etl/shock_gdx/"

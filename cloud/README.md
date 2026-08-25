@@ -51,6 +51,11 @@ Midlertidige stød: `--shock-profile ar` (0,9^dt — DREAMs AR_profile, filnavn 
 vægter ændringen år for år fra det første stødår; alle varianter er ufinansierede.
 `cloud/run_batch3.sh` kører de midlertidige varianter af de allerede løste stød.
 
+Bundter: `--shock-name pM,pXUdl` støder flere instrumenter med samme faktor/profil
+(DREAMs `Udenlandske_priser`). Bemærk at `pOlieBrent` næsten ikke bider i
+kalibrerings-konfigurationen (de priser, olieprisen skulle påvirke, er faste datainput);
+de udenlandske pris-stød er erstatningen.
+
 ## Ny MAKRO-version: grundforløb og scenarier skifter samlet
 
 DREAM udgiver nye versioner 2–4 gange om året (fx 2025-December, 2026-Maj, 2026-June);

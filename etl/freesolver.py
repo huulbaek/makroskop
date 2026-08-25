@@ -578,7 +578,10 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
     window = Window(system, convert_dir, from_year)
     print(f"window: {len(window.eq_sel):,} equations ({window.n_years} years)")
 
-    matched = find_shock_variables_with_years(convert_dir, shock_name, shock_years)
+    # A comma-separated --shock-name is a bundle (e.g. 'pM,pXUdl' = DREAM's Udenlandske_priser):
+    # every listed instrument gets the same factor/delta/profile.
+    matched = [pair for name in shock_name.split(",")
+               for pair in find_shock_variables_with_years(convert_dir, name.strip(), shock_years)]
     shock_vars = np.array([var_id for var_id, _ in matched])
     first_year = min(year for _, year in matched)
     weights = np.array([profile_weight(shock_profile, year - first_year) for _, year in matched])
@@ -1528,7 +1531,8 @@ def main() -> None:
                         choices=["parse", "check", "jacobian", "newton", "lutest", "_lu_child",
                                  "structure", "oracle", "solve-export", "export-baseline"])
     parser.add_argument("--shock-name", default="",
-                        help="exact instance 'rRenteECB(2124)' or symbol 'rRenteECB' with --shock-years")
+                        help="exact instance 'rRenteECB(2124)', symbol 'rRenteECB' with --shock-years, "
+                             "or a comma-separated bundle 'pM,pXUdl' (solve-export)")
     parser.add_argument("--shock-years", default="",
                         help="year range for symbol-level shocks, e.g. '2030-2129'")
     parser.add_argument("--shock-factor", type=float, default=1.0)
