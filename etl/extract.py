@@ -100,29 +100,41 @@ def all_series_defs() -> list[SeriesDef]:
     return defs
 
 
-def extract_baseline(container: gt.Container) -> tuple[dict[str, dict[int, float]], dict[str, list[float | None]]]:
-    """Returns (detrended series for shock comparisons, actual-level columns for the app)."""
-    factors = read_trend_factors(container)
+def extract_detrended(container: gt.Container, warn: bool = False) -> dict[str, dict[int, float]]:
+    """Detrended series + ratios, enough for shock-deviation comparisons."""
     detrended: dict[str, dict[int, float]] = {}
-    columns: dict[str, list[float | None]] = {}
     for sdef in all_series_defs():
         values = read_records(container, sdef)
         if not values:
-            print(f"  WARNING: no data for {sdef.key} ({sdef.gdx_name}{list(sdef.selector)})")
+            if warn:
+                print(f"  WARNING: no data for {sdef.key} ({sdef.gdx_name}{list(sdef.selector)})")
             continue
         detrended[sdef.key] = values
-        scale = DISPLAY_SCALE.get(sdef.key, 1)
-        actual = apply_trend(values, sdef.trend, factors)
-        columns[sdef.key] = to_column({year: value * scale for year, value in actual.items()})
     for key, numerator, denominator, *_ in RATIOS:
         if numerator in detrended and denominator in detrended:
-            ratio = {
+            detrended[key] = {
                 year: detrended[numerator][year] / detrended[denominator][year]
                 for year in detrended[numerator]
                 if year in detrended[denominator]
             }
-            detrended[key] = ratio
-            columns[key] = to_column({year: value * 100 for year, value in ratio.items()})
+    return detrended
+
+
+def extract_baseline(container: gt.Container) -> tuple[dict[str, dict[int, float]], dict[str, list[float | None]]]:
+    """Returns (detrended series for shock comparisons, actual-level columns for the app)."""
+    factors = read_trend_factors(container)
+    detrended = extract_detrended(container, warn=True)
+    columns: dict[str, list[float | None]] = {}
+    ratio_keys = {key for key, *_ in RATIOS}
+    for sdef in all_series_defs():
+        if sdef.key not in detrended:
+            continue
+        scale = DISPLAY_SCALE.get(sdef.key, 1)
+        actual = apply_trend(detrended[sdef.key], sdef.trend, factors)
+        columns[sdef.key] = to_column({year: value * scale for year, value in actual.items()})
+    for key in ratio_keys:
+        if key in detrended:
+            columns[key] = to_column({year: value * 100 for year, value in detrended[key].items()})
     return detrended, columns
 
 
@@ -281,7 +293,7 @@ def main() -> None:
     reference_path = args.shocks_dir / "_reference.gdx"
     if reference_path.exists():
         print("Reading solver reference (_reference.gdx) for shock comparisons ...")
-        shock_reference, _ = extract_baseline(open_gdx(reference_path))
+        shock_reference = extract_detrended(open_gdx(reference_path))
     else:
         shock_reference = detrended
     (args.out / "baseline.json").write_text(
@@ -297,6 +309,9 @@ def main() -> None:
             print(f"Reading shock {gdx_path.name} ...")
             payload = {"shock": shock_name, "variation": suffix, "synthetic": False,
                        **extract_shock(gdx_path, shock_reference)}
+            if reference_path.exists():
+                # solver scenarios fix pre-window years, so the 2022-evaluated HBI is frozen
+                payload["hbi"] = None
             (args.out / "shocks" / f"{shock_name}{suffix}.json").write_text(json.dumps(payload), encoding="utf-8")
             available.setdefault(shock_name, []).append(suffix)
 

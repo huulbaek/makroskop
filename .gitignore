@@ -19,4 +19,4 @@ etl/cache/
 
 # cloud bundle
 makroskop-cloud.tar.gz
-etl/run*.log
+etl/*.log
