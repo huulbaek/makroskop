@@ -90,6 +90,18 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
   acceptance: a chord follow-up step with the LU in hand; if it lands below the start
   residual the full step is kept. Never backtrack to tiny alpha on this system: it never
   recovers and each attempt burns a factorization (batch2.log, 2026-08-25/26).
+  Continuation stages start from a *secant predictor* (extrapolation of the last two
+  converged stages; the checkpoint carries `prev_x`/`prev_share`), falling back to the
+  zero-order start when its residual is lower — 2–80× smaller start residuals on the
+  12-year test, identical solution to 1e-11.
+- THE POLE: in the calibration configuration the implied-rate j-terms `jrUdlAktRenter`,
+  `jrUdlPasRenter`, `jrUdlAktOmv`, `jrUdlPasOmv` are endogenous (`jr = income·fv/stock − r`),
+  and `vUdlAkt(Obl)` crosses zero in 2064/65 → jr has a pole that every shock moves. That
+  single equation instance caused all the "line search failed"/tiny-alpha grinds (found with
+  the worst-residual diagnostic, 2026-08-26). `Window` drops those equations and freezes the
+  j-terms (`POLE_JTERMS`) — exact for all other variables since the j-terms appear nowhere
+  else; frozen j-terms export at reference values. Diagnose future stalls the same way: read
+  the `worst residual (...)` lines before touching the solver.
 - KEEP `pardiso` FIRST in the backend chain even though its factorizations get rejected:
   importing pypardiso loads MKL, and UMFPACK's BLAS then runs on MKL (parallel,
   `openmp_worker` threads). kvxopt's bundled OpenBLAS is a serial build, so

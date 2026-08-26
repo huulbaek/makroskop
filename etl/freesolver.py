@@ -1035,18 +1035,76 @@ def make_direct_solver(matrix):
 _PARDISO_REJECTIONS = [0]
 
 
+# Implied-rate j-terms on the foreign portfolio positions. Their defining equations,
+#   vUdlAktRenter[p,t] = (rRente[p,t] + jrUdlAktRenter[p,t] + res) * vUdlAkt[p,t-1]/fv   (Pas/Omv alike),
+# are solved for the j-term in the calibration configuration, i.e. jr = income*fv/stock - r:
+# a pole wherever the stock crosses zero (reference: vUdlAkt(Obl) passes zero in 2064/65 and
+# jr(Obl) goes -15.9 -> +7.3). Every shock moves the crossing year, so the continuation had to
+# drag a j-term through infinity (AM_bidrag stuck near share 0.10, tBund crawling at 0.73;
+# batch2.log 2026-08-26, worst-residual diagnostic). The j-terms appear in no other equation,
+# so dropping the equation and freezing the j-term is exact for every other variable; frozen
+# j-terms are exported at their reference values.
+POLE_JTERMS = ("jrUdlAktRenter", "jrUdlPasRenter", "jrUdlAktOmv", "jrUdlPasOmv")
+
+
+def load_pole_jterms(convert_dir: Path, is_fixed: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """0-based indices of (equations to drop, free j-term variables to freeze), matched per instance."""
+    eq_idx: dict[str, int] = {}   # "jrUdlAktRenter(Obl,2065)" -> equation index
+    var_idx: dict[str, int] = {}
+    section = ""
+    with (convert_dir / "dict.txt").open(encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith("Equations "):
+                section = "e"
+                continue
+            if line.startswith("Variables "):
+                section = "x"
+                continue
+            if not section or "jrUdl" not in line:
+                continue
+            parts = line.split()
+            if len(parts) < 2 or not parts[0][1:].isdigit():
+                continue
+            name, index = parts[1], int(parts[0][1:]) - 1
+            if section == "e" and parts[0][0] == "e" and name.startswith("E_"):
+                stem, _, args = name[2:].partition("(")
+                for jterm in POLE_JTERMS:
+                    if stem == f"{jterm}_portf":
+                        eq_idx[f"{jterm}({args}"] = index
+            elif section == "x" and parts[0][0] == "x" and name.partition("(")[0] in POLE_JTERMS:
+                var_idx[name] = index
+    pairs = [(e, var_idx[key]) for key, e in eq_idx.items()
+             if key in var_idx and not is_fixed[var_idx[key]]]
+    eqs = np.array(sorted(e for e, _ in pairs), dtype=np.int64)
+    variables = np.array(sorted(v for _, v in pairs), dtype=np.int64)
+    return eqs, variables
+
+
 class Window:
-    """A trailing time-window of the system: equations/free vars with year >= from_year."""
+    """A trailing time-window of the system: equations/free vars with year >= from_year.
+
+    The pole j-term equations (POLE_JTERMS) are excluded and their j-terms frozen.
+    """
 
     def __init__(self, system: System, convert_dir: Path, from_year: int):
+        self.convert_dir = convert_dir
         self.from_year = from_year
         self.n_years = 2130 - from_year
         eq_year, var_year = load_years(convert_dir, system.n_eq, len(system.levels))
         self.eq_year = eq_year
         self.var_year = var_year
-        self.eq_sel = np.where(eq_year >= from_year)[0]
+        drop_eqs, freeze_vars = load_pole_jterms(convert_dir, system.is_fixed)
+        keep_eq = np.ones(system.n_eq, dtype=bool)
+        keep_eq[drop_eqs] = False
+        keep_var = np.ones(len(system.levels), dtype=bool)
+        keep_var[freeze_vars] = False
+        self.eq_sel = np.where((eq_year >= from_year) & keep_eq)[0]
         free_year = var_year[system.free_ids]
-        var_sel = np.where(free_year >= from_year)[0]
+        var_sel = np.where((free_year >= from_year) & keep_var[system.free_ids])[0]
+        dropped = int((eq_year[drop_eqs] >= from_year).sum())
+        if dropped:
+            print(f"dropped {dropped} implied-rate j-term equations (pole at zero stock); "
+                  f"their j-terms are frozen at reference values", flush=True)
         assert len(self.eq_sel) == len(var_sel), (len(self.eq_sel), len(var_sel))
         self.window_vars = system.free_ids[var_sel]
         self.eq_perm = self.eq_sel[np.argsort(eq_year[self.eq_sel], kind="stable")]
@@ -1067,6 +1125,14 @@ class Window:
 _FORCE_LOOKAHEAD = os.environ.get("FREESOLVER_TEST_FORCE_LOOKAHEAD") == "1"
 
 
+def worst_residuals(window: "Window", residual_full: np.ndarray, top: int = 5) -> str:
+    """Name the equations behind the largest window residuals (diagnostic for rejected steps)."""
+    sel = window.eq_sel
+    order = np.argsort(-np.abs(residual_full[sel]))[:top]
+    names = equation_names(window.convert_dir, {int(sel[i]) + 1 for i in order})
+    return ", ".join(f"{names.get(int(sel[i]) + 1, '?')}={residual_full[sel[i]]:.2e}" for i in order)
+
+
 def solve_window(system: System, window: Window, x: np.ndarray,
                  tol: float = 1e-9, max_iter: int = 10, lu_reuse=None):
     """Newton on the window, mutating x in place. Returns (final ||r||_inf, last solver).
@@ -1082,6 +1148,7 @@ def solve_window(system: System, window: Window, x: np.ndarray,
     lu = lu_reuse
     fresh = False
     history: list[float] = [norm]
+    tiny_steps = 0  # consecutive accepted iterations with alpha <= 1/32 and < 10 % progress
 
     for iteration in range(1, max_iter + 1):
         if norm < tol:
@@ -1140,6 +1207,7 @@ def solve_window(system: System, window: Window, x: np.ndarray,
                 # contraction: one chord step from x + dx with the factorization already in hand
                 # (a solve plus a residual evaluation, seconds). Landing below the starting
                 # residual proves the spike was the usual NPV artifact; both steps are kept.
+                full_step_worst = worst_residuals(window, residual_full)
                 dx2 = linear_solve(-residual_full[window.eq_perm])
                 x_next = x_try.copy()
                 x_next[window.window_vars_sorted] += dx2
@@ -1153,6 +1221,8 @@ def solve_window(system: System, window: Window, x: np.ndarray,
                     break
                 print(f"  look-ahead: full step -> {trial_norm:.3e}, chord follow-up -> {next_norm:.3e} "
                       f"(start {norm:.3e}): rejected, backtracking", flush=True)
+                print(f"  worst residual (full step): {full_step_worst}", flush=True)
+                print(f"  worst residual (follow-up): {worst_residuals(window, residual_full)}", flush=True)
             alpha *= 0.5
         if not accepted:
             system.residuals(x, residual_full)  # restore residual at x
@@ -1174,6 +1244,13 @@ def solve_window(system: System, window: Window, x: np.ndarray,
         if not (alpha == 1.0 and reduction <= 0.02):
             lu = None
         fresh = False
+        # Tiny-alpha grind: on this system alpha <= 1/32 steps shave ~1 % per factorization and
+        # rarely lead anywhere; hand the problem back to the continuation (smaller shock step)
+        # after two of them instead of spending up to max_iter factorizations.
+        tiny_steps = tiny_steps + 1 if (alpha <= 1 / 32 and reduction > 0.9) else 0
+        if tiny_steps >= 2:
+            print("  stalled on tiny steps (2 iterations, < 10 % progress); stopping", flush=True)
+            return norm, lu
     return norm, lu
 
 
@@ -1191,14 +1268,28 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.nd
     solved_share = 0.0
     step = 0.01
     checkpoint = x.copy()
+    previous: tuple[float, np.ndarray] | None = None  # the converged stage before `checkpoint`
     lu = None
     attempts = 0
+    residual = np.empty(system.n_eq)
+
+    def start_norm(point: np.ndarray) -> float:
+        system.residuals(point, residual)
+        return float(np.abs(residual[window.eq_sel]).max())
+
+    def save_checkpoint() -> None:
+        if checkpoint_path is None or solved_share >= 1.0:
+            return
+        extra = {"prev_x": previous[1], "prev_share": previous[0]} if previous is not None else {}
+        np.savez(checkpoint_path, x=checkpoint, share=solved_share, step=step, **extra)
 
     if checkpoint_path is not None and checkpoint_path.exists():
         saved = np.load(checkpoint_path)
         checkpoint = saved["x"]
         solved_share = float(saved["share"])
         step = float(saved["step"])
+        if "prev_x" in saved.files:
+            previous = (float(saved["prev_share"]), saved["prev_x"])
         x[:] = checkpoint
         print(f"resumed from checkpoint: share {solved_share:.4f}, step {step:.4f}", flush=True)
 
@@ -1210,13 +1301,29 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.nd
         x[:] = checkpoint
         x[shock_vars] = base_values + share * deltas
         print(f"--- continuation: {solved_share:.4f} -> {share:.4f} of shock ---", flush=True)
+        if previous is not None:
+            # Secant predictor: extrapolate the whole response from the last two converged
+            # stages instead of starting with only the instruments moved (zero-order). In the
+            # strongly nonlinear regions the zero-order start sits outside Newton's basin
+            # (start residuals 1-7, full steps exploding to 1e4-1e5 even with a fresh
+            # Jacobian; batch2.log 2026-08-26). Two residual evaluations pick the better start.
+            prev_share, prev_x = previous
+            ratio = (share - solved_share) / (solved_share - prev_share)
+            secant = checkpoint + ratio * (checkpoint - prev_x)
+            secant[shock_vars] = base_values + share * deltas
+            zero_norm, secant_norm = start_norm(x), start_norm(secant)
+            if np.isfinite(secant_norm) and secant_norm < zero_norm:
+                x[:] = secant
+                print(f"  secant predictor: start {secant_norm:.3e} (zero-order {zero_norm:.3e})", flush=True)
+            else:
+                print(f"  zero-order predictor: start {zero_norm:.3e} (secant {secant_norm:.3e})", flush=True)
         norm, lu = solve_window(system, window, x, tol=tol, max_iter=8, lu_reuse=lu)
         if norm < tol:
+            previous = (solved_share, checkpoint)
             solved_share = share
             checkpoint = x.copy()
             step = min(step * 2.5, 1.0 - solved_share) or step
-            if checkpoint_path is not None and solved_share < 1.0:
-                np.savez(checkpoint_path, x=checkpoint, share=solved_share, step=step)
+            save_checkpoint()
             if on_stage is not None and solved_share < 1.0 - 1e-12:
                 on_stage(solved_share, checkpoint)
         else:
@@ -1224,6 +1331,7 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.nd
             lu = None
             if step < 1e-4:
                 raise SystemExit(f"continuation stalled at share {solved_share}")
+            save_checkpoint()  # a restart must not replay the failed step sizes
     return tol
 
 
