@@ -1,5 +1,5 @@
 {
- "generated": "2026-08-26",
+ "generated": "2026-08-27",
  "shockYear": 2030,
  "definitionDa": "Multiplikator = ændring i nominelt BNP / ændring i instrumentets nominelle udgift (eller provenu) i samme år, permanent ufinansieret stød.",
  "reference": {
@@ -27,7 +27,11 @@
    "id": "Offentlig_varekoeb_ufin",
    "labelDa": "Offentligt materialekøb",
    "costSeries": "vR[off]",
-   "ours": null,
+   "ours": {
+    "year1": 0.69,
+    "year2": 0.77,
+    "impulsePctGdp": 0.086
+   },
    "dream": {
     "year1": 0.73,
     "year2": 0.62
@@ -38,7 +42,11 @@
    "id": "Offentlig_Beskaeftigelse_ufin",
    "labelDa": "Offentlig beskæftigelse",
    "costSeries": "vLoensum[off]",
-   "ours": null,
+   "ours": {
+    "year1": 0.94,
+    "year2": 0.94,
+    "impulsePctGdp": 0.189
+   },
    "dream": {
     "year1": 0.8,
     "year2": 0.48
@@ -49,7 +57,11 @@
    "id": "Offentlige_investeringer_ufin",
    "labelDa": "Offentlige investeringer",
    "costSeries": "vI_s[('iTot', 'off')]",
-   "ours": null,
+   "ours": {
+    "year1": 0.78,
+    "year2": 0.94,
+    "impulsePctGdp": 0.038
+   },
    "dream": {
     "year1": 0.77,
     "year2": 0.68
