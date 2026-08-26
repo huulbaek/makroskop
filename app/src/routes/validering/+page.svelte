@@ -82,6 +82,26 @@
 	function pp(value: number | null | undefined): string {
 		return value === null || value === undefined ? '–' : `${daSigned.format(value)} pct.-point`;
 	}
+
+	const multipliers = $derived(data.multipliers);
+
+	/** Rows with a note get a running footnote number in table order. */
+	const multiplierNotes = $derived.by(() => {
+		const notes: { id: string; marker: number; text: string }[] = [];
+		for (const row of multipliers.rows) {
+			if (row.noteDa !== null) notes.push({ id: row.id, marker: notes.length + 1, text: row.noteDa });
+		}
+		return notes;
+	});
+
+	function noteMarker(id: string): number | null {
+		return multiplierNotes.find((note) => note.id === id)?.marker ?? null;
+	}
+
+	/** Multiplier with Danish decimal comma, two decimals; "–" when DREAM has no figure. */
+	function mult(value: number | null | undefined): string {
+		return value === null || value === undefined ? '–' : daTwo.format(value);
+	}
 </script>
 
 <svelte:head>
@@ -289,6 +309,74 @@
 			</div>
 		</div>
 	</div>
+</section>
+
+<section class="card multipliers">
+	<h2>Sammenlignet med DREAMs egne multiplikatorer</h2>
+	<p class="story">
+		DREAM har offentliggjort finanspolitiske multiplikatorer for MAKRO i
+		<a href={multipliers.reference.url} target="_blank" rel="noopener noreferrer"
+			>Finanspolitiske multiplikatorer i MAKRO</a
+		> (december 2021). {multipliers.definitionDa} Begge sæt tal gælder permanente, ufinansierede
+		stød; MAKROskops stødår er {multipliers.shockYear}, mens DREAMs reference er
+		{multipliers.reference.modelDa}.
+	</p>
+	<div class="table-scroll">
+		<table class="results multiplier-table">
+			<thead>
+				<tr>
+					<th scope="col">Instrument</th>
+					<th scope="col">Impuls (pct. af BNP)</th>
+					<th scope="col">År 1 — MAKROskop</th>
+					<th scope="col">År 1 — DREAM</th>
+					<th scope="col">År 2 — MAKROskop</th>
+					<th scope="col">År 2 — DREAM</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each multipliers.rows as row (row.id)}
+					{@const marker = noteMarker(row.id)}
+					<tr>
+						<th scope="row">
+							{row.labelDa}{#if marker !== null}<sup class="note-marker">{marker}</sup>{/if}
+						</th>
+						{#if row.ours}
+							<td>{daTwo.format(row.ours.impulsePctGdp)}</td>
+							<td>{daTwo.format(row.ours.year1)}</td>
+							<td>{mult(row.dream.year1)}</td>
+							<td>{daTwo.format(row.ours.year2)}</td>
+							<td>{mult(row.dream.year2)}</td>
+						{:else}
+							<td>–</td>
+							<td class="pending">afventer beregning</td>
+							<td>{mult(row.dream.year1)}</td>
+							<td class="pending">afventer beregning</td>
+							<td>{mult(row.dream.year2)}</td>
+						{/if}
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+	{#if multiplierNotes.length > 0}
+		<ol class="notes">
+			{#each multiplierNotes as note (note.id)}
+				<li value={note.marker}>{note.text}</li>
+			{/each}
+		</ol>
+	{/if}
+	<p class="footnote">
+		<strong>Forbehold.</strong> DREAMs tal stammer fra beta-versionen fra 2021 med stødår 2026 og en
+		finansierings- og lukningsopsætning, der afviger i detaljerne. Overensstemmelse inden for cirka
+		±0,2 er, hvad man bør forvente; større afstande peger på forskelle i instrument eller
+		konfiguration.
+	</p>
+	<p class="footnote">
+		Kilde:
+		<a href={multipliers.reference.url} target="_blank" rel="noopener noreferrer"
+			>{multipliers.reference.source}</a
+		>.
+	</p>
 </section>
 
 {#if flagship}
@@ -551,6 +639,66 @@
 		padding: 5px 0;
 		border-bottom: 1px solid var(--grid);
 		white-space: nowrap;
+	}
+
+	.multipliers .story {
+		max-width: 72ch;
+		margin-bottom: 12px;
+	}
+
+	.table-scroll {
+		overflow-x: auto;
+	}
+
+	.multiplier-table {
+		min-width: 560px;
+	}
+
+	.multiplier-table th,
+	.multiplier-table td {
+		padding: 6px 14px 6px 0;
+	}
+
+	.multiplier-table thead th {
+		font-size: 12px;
+		color: var(--ink-muted);
+		vertical-align: bottom;
+	}
+
+	.multiplier-table thead th:not(:first-child),
+	.multiplier-table td {
+		text-align: right;
+	}
+
+	.multiplier-table tbody th {
+		color: var(--ink);
+		white-space: nowrap;
+	}
+
+	.multiplier-table td:last-child,
+	.multiplier-table th:last-child {
+		padding-right: 0;
+	}
+
+	.multiplier-table .pending {
+		font-weight: 400;
+		font-style: italic;
+		color: var(--ink-secondary);
+	}
+
+	.note-marker {
+		font-size: 10px;
+		margin-left: 2px;
+		color: var(--ink-muted);
+	}
+
+	.notes {
+		font-size: 12px;
+		color: var(--ink-muted);
+		margin: 10px 0 0;
+		padding-left: 18px;
+		display: grid;
+		gap: 3px;
 	}
 
 	.mono-table td,

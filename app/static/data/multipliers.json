@@ -1,0 +1,75 @@
+{
+ "generated": "2026-08-26",
+ "shockYear": 2030,
+ "definitionDa": "Multiplikator = ændring i nominelt BNP / ændring i instrumentets nominelle udgift (eller provenu) i samme år, permanent ufinansieret stød.",
+ "reference": {
+  "source": "DREAM: Finanspolitiske multiplikatorer i MAKRO (december 2021), tabel 3.1 og 3.2, permanent ufinansieret stød",
+  "url": "https://dreamgruppen.dk/media/9752/finanspolitiske_multiplikatorer_i_makro.pdf",
+  "modelDa": "MAKRO (beta-version, 2021), stødår 2026"
+ },
+ "rows": [
+  {
+   "id": "Bundskat_ufin",
+   "labelDa": "Bundskat",
+   "costSeries": "vtBund[tot]",
+   "ours": {
+    "year1": 0.76,
+    "year2": 0.96,
+    "impulsePctGdp": 0.507
+   },
+   "dream": {
+    "year1": 0.69,
+    "year2": 0.69
+   },
+   "noteDa": "Skattestigning her, skattelettelse hos DREAM; multiplikatoren er fortegnsvendt, så tallene er sammenlignelige."
+  },
+  {
+   "id": "Offentlig_varekoeb_ufin",
+   "labelDa": "Offentligt materialekøb",
+   "costSeries": "vR[off]",
+   "ours": null,
+   "dream": {
+    "year1": 0.73,
+    "year2": 0.62
+   },
+   "noteDa": null
+  },
+  {
+   "id": "Offentlig_Beskaeftigelse_ufin",
+   "labelDa": "Offentlig beskæftigelse",
+   "costSeries": "vLoensum[off]",
+   "ours": null,
+   "dream": {
+    "year1": 0.8,
+    "year2": 0.48
+   },
+   "noteDa": "DREAM endogeniserer offentligt forbrug og holder materialekøb fast i dette stød; MAKROskop hæver kun timerne."
+  },
+  {
+   "id": "Offentlige_investeringer_ufin",
+   "labelDa": "Offentlige investeringer",
+   "costSeries": "vI_s[('iTot', 'off')]",
+   "ours": null,
+   "dream": {
+    "year1": 0.77,
+    "year2": 0.68
+   },
+   "noteDa": null
+  },
+  {
+   "id": "Offentligt_forbrug_ufin",
+   "labelDa": "Offentligt forbrug (alle input)",
+   "costSeries": "vG[gTot]",
+   "ours": {
+    "year1": 0.99,
+    "year2": 1.01,
+    "impulsePctGdp": 0.273
+   },
+   "dream": {
+    "year1": null,
+    "year2": null
+   },
+   "noteDa": "Ingen DREAM-reference for det samlede stød; vist for fuldstændighed."
+  }
+ ]
+}

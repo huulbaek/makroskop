@@ -47,6 +47,23 @@ export interface ScenarioSolve {
 	lastStageLabelDa: string;
 }
 
+export interface MultiplierRow {
+	id: string;
+	labelDa: string;
+	costSeries: string;
+	ours: { year1: number; year2: number; impulsePctGdp: number } | null;
+	dream: { year1: number | null; year2: number | null };
+	noteDa: string | null;
+}
+
+export interface Multipliers {
+	generated: string;
+	shockYear: number;
+	definitionDa: string;
+	reference: { source: string; url: string; modelDa: string };
+	rows: MultiplierRow[];
+}
+
 export interface Validation {
 	generated: string;
 	model: { name: string; commit: string };
@@ -71,9 +88,10 @@ export interface Validation {
 export const load: PageLoad = async ({ fetch }) => {
 	const response = await fetch('/data/validation.json');
 	const validation = (await response.json()) as Validation;
-	const [baseline, scenario] = await Promise.all([
+	const [baseline, scenario, multipliers] = await Promise.all([
 		loadBaseline(fetch),
-		loadScenario(fetch, validation.scenario.id)
+		loadScenario(fetch, validation.scenario.id),
+		fetch('/data/multipliers.json').then((r) => r.json() as Promise<Multipliers>)
 	]);
-	return { validation, years: baseline.years, scenario };
+	return { validation, years: baseline.years, scenario, multipliers };
 };
