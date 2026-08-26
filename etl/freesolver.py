@@ -581,8 +581,8 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
 
     # A comma-separated --shock-name is a bundle (e.g. 'pM,pXUdl' = DREAM's Udenlandske_priser):
     # every listed instrument gets the same factor/delta/profile.
-    matched = [pair for name in shock_name.split(",")
-               for pair in find_shock_variables_with_years(convert_dir, name.strip(), shock_years)]
+    matched = [pair for name in split_bundle(shock_name)
+               for pair in find_shock_variables_with_years(convert_dir, name, shock_years)]
     shock_vars = np.array([var_id for var_id, _ in matched])
     first_year = min(year for _, year in matched)
     weights = np.array([profile_weight(shock_profile, year - first_year) for _, year in matched])
@@ -1362,17 +1362,51 @@ def find_shock_variables(convert_dir: Path, name: str, years: tuple[int, int] | 
     return [var_id for var_id, _ in find_shock_variables_with_years(convert_dir, name, years)]
 
 
+def split_bundle(spec: str) -> list[str]:
+    """Split a comma-separated shock bundle, ignoring commas inside parentheses."""
+    items, depth, current = [], 0, []
+    for char in spec:
+        if char == "," and depth == 0:
+            items.append("".join(current).strip())
+            current = []
+            continue
+        depth += (char == "(") - (char == ")")
+        current.append(char)
+    items.append("".join(current).strip())
+    return [item for item in items if item]
+
+
+def _position_matches(pattern: str, key: str) -> bool:
+    """One domain position of a shock pattern: '*', a literal, 'a|b' alternatives, '!a|b' exclusion."""
+    if pattern == "*":
+        return True
+    if pattern.startswith("!"):
+        return key not in pattern[1:].split("|")
+    return key in pattern.split("|")
+
+
 def find_shock_variables_with_years(convert_dir: Path, name: str,
                                     years: tuple[int, int] | None) -> list[tuple[int, int]]:
     """(variable id, year) pairs for a shock spec.
 
     'rRenteECB(2124)' -> that exact instance; 'rRenteECB' + years -> every instance
-    (all domain combinations) whose final index falls in the year range.
+    (all domain combinations) whose final index falls in the year range; a pattern such
+    as 'qR(off,*)', 'qI_s(*,off,*)' or 'uvOvfSats(!boernyd|boligyd,*)' -> the instances
+    whose domain keys match position by position ('*' any, 'a|b' alternatives, '!a|b'
+    exclusion), again filtered by the year range on the final index. Patterns are how
+    DREAM's sector-restricted standard shocks (Analysis/Standard_shocks) are expressed.
     """
+    pattern: list[str] | None = None
     if "(" in name:
-        year = name.rstrip(")").rsplit(",", 1)[-1].rsplit("(", 1)[-1]
-        return [(find_variable(convert_dir, name), int(year) if year.isdigit() else 0)]
-    prefix = name + "("
+        stem, _, args = name.rstrip(")").partition("(")
+        if any(token in args for token in ("*", "|", "!")):
+            pattern = args.split(",")
+        else:
+            year = args.rsplit(",", 1)[-1]
+            return [(find_variable(convert_dir, name), int(year) if year.isdigit() else 0)]
+        prefix = stem + "("
+    else:
+        prefix = name + "("
     ids: list[tuple[int, int]] = []
     with (convert_dir / "dict.txt").open(encoding="utf-8") as handle:
         in_vars = False
@@ -1385,7 +1419,11 @@ def find_shock_variables_with_years(convert_dir: Path, name: str,
             parts = line.split()
             if len(parts) < 2 or not parts[1].startswith(prefix):
                 continue
-            last_key = parts[1].rstrip(")").rsplit(",", 1)[-1].rsplit("(", 1)[-1]
+            keys = parts[1][len(prefix):].rstrip(")").split(",")
+            if pattern is not None and (len(keys) != len(pattern) or not all(
+                    _position_matches(pat, key) for pat, key in zip(pattern, keys))):
+                continue
+            last_key = keys[-1]
             if not last_key.isdigit():
                 continue
             if years is None or years[0] <= int(last_key) <= years[1]:

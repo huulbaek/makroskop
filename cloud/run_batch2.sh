@@ -27,8 +27,10 @@ run Bundskat_ufin.gdx                        --shock-name tBund      --shock-yea
 run AM_bidrag_ufin.gdx                       --shock-name tAMbidrag  --shock-years 2030-2129 --shock-delta 0.01
 run Selskabsskat_ufin.gdx                    --shock-name tSelskab   --shock-years 2030-2129 --shock-delta 0.01
 run Ejendomsvaerdiskat_ufin.gdx              --shock-name tEjd       --shock-years 2030-2129 --shock-factor 1.10
-run Offentligt_forbrug_ufin.gdx              --shock-name uG         --shock-years 2030-2129 --shock-factor 1.01
-run Skattepligtig_indkomstoverforsel_ufin.gdx --shock-name uvOvfSats --shock-years 2030-2129 --shock-factor 1.01
+# DREAM's Offentligt_forbrug scales the public sector's exogenous inputs (not uG, which is only the nest share)
+run Offentligt_forbrug_ufin.gdx              --shock-name "qR(off,*),qE(off,*),hL(off,*),qI_s(!iTot,off,*)" --shock-years 2030-2129 --shock-factor 1.01
+# taxable transfer types only (DREAM: not ubeskat[ovf])
+run Skattepligtig_indkomstoverforsel_ufin.gdx --shock-name "uvOvfSats(!boernyd|boligyd|iskatpl|groen|lumpsumovf,*)" --shock-years 2030-2129 --shock-factor 1.01
 run Eksportmarkedsvaekst_ufin.gdx            --shock-name uXMarked   --shock-years 2030-2129 --shock-factor 1.01
 run Befolkning_ufin.gdx                      --shock-name nPop       --shock-years 2030-2129 --shock-factor 1.01
 

@@ -209,11 +209,14 @@ SHOCK_RUNS: list[ShockRun] = [
     ShockRun("AM_bidrag", "tAMbidrag", "Arbejdsmarkedsbidrag, sats", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM),
     ShockRun("Selskabsskat", "tSelskab", "Selskabsskattesats", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM),
     ShockRun("Ejendomsvaerdiskat", "tEjd", "Ejendomsværdiskat, implicit sats", 1.10, 0.0, "+10 pct. af satsen", 2030, _DREAM_GDP_NORM),
-    ShockRun("Offentligt_forbrug", "uG", "Skalaparameter i det offentlige forbrugsnest", 1.01, 0.0, "+1 pct.", 2030,
-             "DREAMs standardstød hæver offentlige varekøb, beskæftigelse og investeringer svarende til "
-             "1 pct. af BNP; MAKROskop skalerer det offentlige forbrugsnest med 1 pct."),
-    ShockRun("Skattepligtig_indkomstoverforsel", "uvOvfSats", "Satser for skattepligtige overførsler", 1.01, 0.0, "+1 pct.", 2030,
-             "DREAMs standardstød normerer ændringen til 1 pct. af BNP; MAKROskop hæver satserne med 1 pct."),
+    ShockRun("Offentligt_forbrug", "qR(off,*),qE(off,*),hL(off,*),qI_s(!iTot,off,*)",
+             "Offentlig sektors input: varekøb, energi, arbejdstimer og investeringer", 1.01, 0.0, "+1 pct.", 2030,
+             "Samme instrumenter som DREAMs standardstød (den offentlige produktions eksogene input); "
+             "DREAM normerer ændringen til 1 pct. af BNP, MAKROskop hæver alle input med 1 pct."),
+    ShockRun("Skattepligtig_indkomstoverforsel", "uvOvfSats(!boernyd|boligyd|iskatpl|groen|lumpsumovf,*)",
+             "Satser for skattepligtige overførsler (ekskl. de ubeskattede ydelser)", 1.01, 0.0, "+1 pct.", 2030,
+             "Samme afgrænsning som DREAMs standardstød (kun skattepligtige ydelser); DREAM normerer "
+             "ændringen til 1 pct. af BNP, MAKROskop hæver satserne med 1 pct."),
     ShockRun("Eksportmarkedsvaekst", "uXMarked", "Eksportmarkedets størrelse", 1.01, 0.0, "+1 pct.", 2030,
              "DREAMs standardstød normerer ændringen til 1 pct. af BNP i eksport; MAKROskop hæver "
              "eksportmarkedet med 1 pct."),
