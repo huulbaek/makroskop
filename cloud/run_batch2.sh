@@ -6,11 +6,16 @@ set -uo pipefail
 cd "$(dirname "$0")/../etl"
 export PATH="$HOME/.local/bin:$PATH"
 export PYTHONUNBUFFERED=1
-export FREESOLVER_BACKEND=umfpack,superlu
-export OPENBLAS_NUM_THREADS=16 OMP_NUM_THREADS=16   # threading experiment; harmless if ignored
+# NB: no FREESOLVER_BACKEND override (and no OPENBLAS/OMP_NUM_THREADS). Keeping pardiso first in
+# the chain makes pypardiso load MKL, which UMFPACK's BLAS then runs on in parallel; with the
+# override the process ran single-threaded on kvxopt's serial OpenBLAS: 1400–2700 s per
+# factorization (batch2.log, 2026-08-25) versus 330–680 s (run6.log) on the same box.
+# Shared box: if memory runs out, the kernel should kill the (resumable) solver, not Dokploy.
+echo 1000 > /proc/self/oom_score_adj 2>/dev/null || true
 
 run() {
   local out="$1"; shift
+  if [ -f "shock_gdx/$out" ]; then echo "SKIP $out (already exported)"; return; fi
   echo "=============================================================="
   echo "SCENARIO $out"
   echo "=============================================================="

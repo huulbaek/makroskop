@@ -14,6 +14,7 @@ numbers, xN variable references, and the intrinsics sqr/tanh/exp.
 """
 
 import argparse
+import os
 from typing import Callable
 import datetime
 import re
@@ -1061,6 +1062,11 @@ class Window:
         return mask
 
 
+# Test hook: skip the residual-based acceptance so every full step goes through the
+# look-ahead (exercises that path on small windows, where residual spikes never occur).
+_FORCE_LOOKAHEAD = os.environ.get("FREESOLVER_TEST_FORCE_LOOKAHEAD") == "1"
+
+
 def solve_window(system: System, window: Window, x: np.ndarray,
                  tol: float = 1e-9, max_iter: int = 10, lu_reuse=None):
     """Newton on the window, mutating x in place. Returns (final ||r||_inf, last solver).
@@ -1088,20 +1094,24 @@ def solve_window(system: System, window: Window, x: np.ndarray,
             fresh = True
         factor_time = time.time() - t0
         solve_fn, matrix = lu
-        rhs = -residual_full[window.eq_perm]
-        rhs_norm = np.linalg.norm(rhs) + 1e-300
-        dx = solve_fn(rhs)
-        # iterative refinement to measured convergence: backends (Pardiso especially)
-        # deliver ~1e-6 accuracy alone, far too loose for Newton's final digits
-        for _ in range(6):
-            linear_residual = rhs - matrix @ dx
-            if np.linalg.norm(linear_residual) < 1e-11 * rhs_norm:
-                break
-            dx += solve_fn(linear_residual)
-        else:
-            rel = np.linalg.norm(rhs - matrix @ dx) / rhs_norm
-            if rel > 1e-8:
-                print(f"  WARNING: linear solve stalled at rel residual {rel:.1e}", flush=True)
+
+        def linear_solve(rhs: np.ndarray) -> np.ndarray:
+            # iterative refinement to measured convergence: backends (Pardiso especially)
+            # deliver ~1e-6 accuracy alone, far too loose for Newton's final digits
+            rhs_norm = np.linalg.norm(rhs) + 1e-300
+            sol = solve_fn(rhs)
+            for _ in range(6):
+                linear_residual = rhs - matrix @ sol
+                if np.linalg.norm(linear_residual) < 1e-11 * rhs_norm:
+                    break
+                sol += solve_fn(linear_residual)
+            else:
+                rel = np.linalg.norm(rhs - matrix @ sol) / rhs_norm
+                if rel > 1e-8:
+                    print(f"  WARNING: linear solve stalled at rel residual {rel:.1e}", flush=True)
+            return sol
+
+        dx = linear_solve(-residual_full[window.eq_perm])
 
         # Non-monotone acceptance: a full Newton step may raise ||r||_inf temporarily
         # (bilinear cross-terms of large-scale NPV variables) yet be nearly exact in
@@ -1117,14 +1127,38 @@ def solve_window(system: System, window: Window, x: np.ndarray,
             x_try[window.window_vars_sorted] += alpha * dx
             system.residuals(x_try, residual_full)
             trial_norm = np.abs(residual_full[window.eq_sel]).max()
-            if np.isfinite(trial_norm) and (trial_norm < norm or (alpha == 1.0 and trial_norm < reference)):
+            if not _FORCE_LOOKAHEAD and np.isfinite(trial_norm) and (
+                    trial_norm < norm or (alpha == 1.0 and trial_norm < reference)):
                 accepted = True
                 break
+            if alpha == 1.0 and np.isfinite(trial_norm):
+                # Look-ahead acceptance. The spike allowance above is a heuristic, and on the
+                # full-horizon tBund run legitimate full steps spiked 500-800x against the
+                # 1000x allowance: a coin flip that, when lost, backtracked to alpha = 1/64..1/128,
+                # never recovered, and burned a 30-minute factorization per attempt (batch2.log,
+                # 2026-08-25/26). So test the full step for what actually matters — quadratic
+                # contraction: one chord step from x + dx with the factorization already in hand
+                # (a solve plus a residual evaluation, seconds). Landing below the starting
+                # residual proves the spike was the usual NPV artifact; both steps are kept.
+                dx2 = linear_solve(-residual_full[window.eq_perm])
+                x_next = x_try.copy()
+                x_next[window.window_vars_sorted] += dx2
+                system.residuals(x_next, residual_full)
+                next_norm = np.abs(residual_full[window.eq_sel]).max()
+                if np.isfinite(next_norm) and next_norm < norm:
+                    print(f"  look-ahead: full step -> {trial_norm:.3e} (allowance {reference:.1e}), "
+                          f"chord follow-up -> {next_norm:.3e} < start {norm:.3e}: accepted", flush=True)
+                    x_try, trial_norm = x_next, next_norm
+                    accepted = True
+                    break
+                print(f"  look-ahead: full step -> {trial_norm:.3e}, chord follow-up -> {next_norm:.3e} "
+                      f"(start {norm:.3e}): rejected, backtracking", flush=True)
             alpha *= 0.5
         if not accepted:
             system.residuals(x, residual_full)  # restore residual at x
             if fresh:
-                print("  line search failed with fresh Jacobian; stopping", flush=True)
+                print(f"  line search failed with fresh Jacobian (factor {factor_time:.1f}s); stopping",
+                      flush=True)
                 return norm, lu
             lu = None  # stale chord LU: rebuild and retry
             continue

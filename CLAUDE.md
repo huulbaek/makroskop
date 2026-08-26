@@ -85,6 +85,19 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
   unverified Pardiso factorization. Rows are equilibrated; refinement runs to 1e-11.
 - Newton needs non-monotone acceptance (NPV variables legitimately spike the residual
   on full steps) + adaptive shock-size continuation with per-stage disk checkpoints.
+  The spike allowance (1000× start residual) is a coin flip on the full horizon —
+  legitimate tBund steps spiked 500–800× — so `solve_window` also has *look-ahead*
+  acceptance: a chord follow-up step with the LU in hand; if it lands below the start
+  residual the full step is kept. Never backtrack to tiny alpha on this system: it never
+  recovers and each attempt burns a factorization (batch2.log, 2026-08-25/26).
+- KEEP `pardiso` FIRST in the backend chain even though its factorizations get rejected:
+  importing pypardiso loads MKL, and UMFPACK's BLAS then runs on MKL (parallel,
+  `openmp_worker` threads). kvxopt's bundled OpenBLAS is a serial build, so
+  `FREESOLVER_BACKEND=umfpack,...` makes full-horizon factorizations 4–5× slower
+  (1400–2700 s vs 330–680 s on the same box). Don't set OPENBLAS/OMP_NUM_THREADS either.
+- Long box runs: launch batch scripts with `setsid nohup`; a dead parent shell silently
+  ends the batch after the current scenario. `cloud/relaunch_after_stage.sh` restarts a
+  batch at the next checkpoint (e.g. after pushing a new freesolver.py) without losing work.
 - GAMS oracle runs (freesolver oracle) need the user's personal GAMS license
   (network-validated → run Bash with sandbox disabled) and gamspy_base's `gams` binary.
 - GAMS gotcha: `*` is a comment only in column 1; indented `*` is multiplication.

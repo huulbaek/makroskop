@@ -56,6 +56,27 @@ Bundter: `--shock-name pM,pXUdl` støder flere instrumenter med samme faktor/pro
 kalibrerings-konfigurationen (de priser, olieprisen skulle påvirke, er faste datainput);
 de udenlandske pris-stød er erstatningen.
 
+## Batch 2: otte finanspolitiske stød
+
+`cloud/run_batch2.sh` (med i bundtet) kører otte stød sekventielt, checkpointet og
+idempotent: scenarier med eksisterende `shock_gdx/<navn>.gdx` springes over, og et
+dræbt scenario genoptages fra sidste konvergerede kontinuationstrin. Kør løsrevet:
+
+```bash
+nohup bash cloud/run_batch2.sh > batch2.log 2>&1 &
+tail -f batch2.log
+```
+
+Budget: ~450 s pr. faktorisering på en 16–20-kernes boks, typisk 2–3 timer pr. stød.
+Lad `pardiso` stå først i backend-kæden (ingen `FREESOLVER_BACKEND`-override og ingen
+`OPENBLAS_NUM_THREADS`): pypardiso indlæser MKL, som UMFPACK's BLAS derefter kører på —
+uden den er faktoriseringen enkelttrådet og 4–5× langsommere (se CLAUDE.md).
+Skal løseren opdateres midt i et batch: `scp etl/freesolver.py` op og kør
+`setsid nohup bash cloud/relaunch_after_stage.sh > relaunch.log 2>&1 &` — den venter
+på næste checkpoint og genstarter batchet derfra.
+Deler boksen med andet (fx Dokploy), sætter scriptet sig selv som foretrukket
+OOM-offer, så det er løseren og ikke produktionscontainerne, kernen dræber.
+
 ## Ny MAKRO-version: grundforløb og scenarier skifter samlet
 
 DREAM udgiver nye versioner 2–4 gange om året (fx 2025-December, 2026-Maj, 2026-June);
