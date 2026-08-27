@@ -33,7 +33,7 @@ run Overforsel_privat_ufin.gdx            --shock-name vOffTilHhRest --shock-yea
 run Grundskyld_ufin.gdx                   --shock-name tGrund --shock-years 2030-2129 --shock-factor 1.10
 run Vaegtafgift_ufin.gdx                  --shock-name utHhVaegt --shock-years 2030-2129 --shock-factor 1.10
 run Aktieskat_ufin.gdx                    --shock-name tAktieTop --shock-years 2030-2129 --shock-delta 0.01
-run Moms_ufin.gdx                         --shock-name "tMoms_y,tMoms_m" --shock-years 2030-2129 --shock-delta 0.01
+run Moms_ufin.gdx                         --shock-name "tMoms_y,tMoms_m" --shock-years 2030-2129 --shock-delta 0.005   # +1 pp hits a model boundary (qBolig(18) -> 0 around 2110) at share 0.93
 run Registreringsafgift_ufin.gdx          --shock-name "tReg_y,tReg_m" --shock-years 2030-2129 --shock-factor 1.10
 run Energiafgift_ufin.gdx                 --shock-name "tAfg_y(cEne,*,*),tAfg_m(cEne,*,*)" --shock-years 2030-2129 --shock-factor 1.10
 run Forbrugsafgift_ufin.gdx               --shock-name "tAfg_y(cVar,*,*),tAfg_m(cVar,*,*)" --shock-years 2030-2129 --shock-factor 1.10

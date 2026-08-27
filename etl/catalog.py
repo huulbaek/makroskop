@@ -245,7 +245,9 @@ SHOCK_RUNS: list[ShockRun] = [
     ShockRun("Vaegtafgift", "utHhVaegt", "Vægtafgift, implicit sats", 1.10, 0.0, "+10 pct. af satsen", 2030, _DREAM_GDP_NORM),
     ShockRun("Aktieskat", "tAktieTop", "Aktieindkomstskat, topsats", 1.0, 0.01, "+1 pct.-point", 2030,
              "DREAM ændrer både top- og lavsatsen normeret til 1 pct. af BNP; i denne konfiguration er kun topsatsen en variabel."),
-    ShockRun("Moms", "tMoms_y,tMoms_m", "Momssatser (indenlandsk og importeret)", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM),
+    ShockRun("Moms", "tMoms_y,tMoms_m", "Momssatser (indenlandsk og importeret)", 1.0, 0.005, "+0,5 pct.-point", 2030,
+             _DREAM_GDP_NORM + " Stødet er halveret i forhold til de øvrige satsstød: ved ca. 0,9 pct.-point rammer "
+             "de 18-åriges ejerboligbeholdning omkring 2110 nul, og modellen har ingen håndtering af den grænse."),
     ShockRun("Registreringsafgift", "tReg_y,tReg_m", "Registreringsafgift, implicitte satser", 1.10, 0.0, "+10 pct. af satsen", 2030, _DREAM_GDP_NORM),
     ShockRun("Energiafgift", "tAfg_y(cEne,*,*),tAfg_m(cEne,*,*)", "Energiafgifter på privat forbrug", 1.10, 0.0, "+10 pct. af satsen", 2030, _DREAM_GDP_NORM),
     ShockRun("Forbrugsafgift", "tAfg_y(cVar,*,*),tAfg_m(cVar,*,*)", "Øvrige afgifter på privat vareforbrug", 1.10, 0.0, "+10 pct. af satsen", 2030, _DREAM_GDP_NORM),
