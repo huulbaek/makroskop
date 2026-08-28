@@ -257,12 +257,16 @@ SHOCK_RUNS: list[ShockRun] = [
     ShockRun("Lontilskud", "rSubLoen(!tot,*)", "Løntilskudssatser", 1.10, 0.0, "+10 pct. af satsen", 2030, _DREAM_GDP_NORM),
     ShockRun("Produktionssubsidier", "rSubYRest(!tot,*)", "Øvrige produktionssubsidier, sats", 1.10, 0.0, "+10 pct. af satsen", 2030,
              "DREAM hæver subsidiebeløbet (1 pct. af BNP) og endogeniserer satsen; MAKROskop hæver satsen direkte."),
-    ShockRun("Arbejdsudbud_beskaeftigelse", "uDeltag", "Erhvervsdeltagelse, alle aldre", 1.01, 0.0, "+1 pct.", 2030,
-             "DREAM hæver den strukturelle beskæftigelse med 1 pct. og endogeniserer deltagelsesparameteren; "
-             "MAKROskop hæver deltagelsesparameteren direkte med 1 pct."),
-    ShockRun("Arbejdsudbud_timer", "uh", "Arbejdstid pr. beskæftiget, alle aldre", 1.01, 0.0, "+1 pct.", 2030,
-             "DREAM hæver de strukturelle timer med 1 pct. og endogeniserer timeparameteren; "
-             "MAKROskop hæver timeparameteren direkte med 1 pct."),
+    ShockRun("Arbejdsudbud_beskaeftigelse", "snLHh (uDeltag endogen)", "Strukturel beskæftigelse, alle aldre 15-100",
+             1.01, 0.0, "+1 pct.", 2030,
+             "Samme lukning som DREAMs standardstød: den strukturelle beskæftigelse hæves 1 pct. for hver alder, "
+             "og husholdningernes deltagelsesparameter uDeltag frigives alder for alder, så den rammer målet. "
+             "(uDeltag er en ulempeparameter — at hæve den direkte sænker deltagelsen.)"),
+    ShockRun("Arbejdsudbud_timer", "uh", "Timepræferenceparameter (strukturel arbejdstid = 1/uh)",
+             1 / 1.01, 0.0, "+1 pct. strukturel arbejdstid", 2030,
+             "Samme virkning som DREAMs standardstød: DREAM hæver den strukturelle arbejdstid shLHh 1 pct. og "
+             "endogeniserer uh; i modellen er shLHh = 1/uh eksakt, så MAKROskop sætter uh til 1/1,01 gange "
+             "grundforløbets værdi, hvilket giver præcis +1 pct. arbejdstid for alle aldre."),
     ShockRun("ArbejdsProd", "qProdHh_t,qProdxDK", "Arbejdskraftproduktivitet (trend)", 1.01, 0.0, "+1 pct.", 2030,
              "Samme instrumenter og størrelse som DREAMs standardstød."),
     ShockRun("VirkDisk", "rVirkDiskPrem(!spTot,*)", "Virksomhedernes risikopræmie (hurdle rate)", 1.0, 0.001, "+0,1 pct.-point", 2030,

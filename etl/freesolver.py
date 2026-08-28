@@ -414,14 +414,25 @@ class System:
         self.levels = data["levels"]
         self.is_fixed = data["is_fixed"]
         self.n_eq = len(self.rhs)
-        self.free_ids = np.where(~self.is_fixed)[0]
-        self.free_index = np.full(len(self.levels), -1, dtype=np.int64)
-        self.free_index[self.free_ids] = np.arange(len(self.free_ids))
+        self._index_free()
         var_counts = np.add.reduceat((self.code == OP_VAR).astype(np.int64), self.eq_offsets[:-1])
         self.entry_offsets = np.zeros(self.n_eq + 1, dtype=np.int64)
         np.cumsum(var_counts, out=self.entry_offsets[1:])
         self._jac_kernel = make_jacobian_kernel()
         self._eval_kernel = make_kernel()
+
+    def _index_free(self) -> None:
+        self.free_ids = np.where(~self.is_fixed)[0]
+        self.free_index = np.full(len(self.levels), -1, dtype=np.int64)
+        self.free_index[self.free_ids] = np.arange(len(self.free_ids))
+
+    def swap(self, fix_ids: np.ndarray, free_ids: np.ndarray) -> None:
+        """Exo/endo swap: fix `fix_ids` (currently free) and free `free_ids` (currently fixed).
+
+        One-for-one, so the system stays square; call before building a Window.
+        """
+        apply_swap(self.is_fixed, fix_ids, free_ids)
+        self._index_free()
 
     def residuals(self, x: np.ndarray, out: np.ndarray) -> np.ndarray:
         self._eval_kernel(self.code, self.args, self.consts, self.eq_offsets, self.rhs, x, out)
@@ -565,8 +576,12 @@ def export_solution_gdx(convert_dir: Path, x: np.ndarray, out_path: Path,
 def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, int] | None,
                      shock_factor: float, shock_delta: float, out_path: Path,
                      convert_dir: Path, tol: float, export_stages: bool = False,
-                     shock_profile: str = "permanent") -> None:
+                     shock_profile: str = "permanent", endogenize: str = "") -> None:
     """Solve a (possibly multi-year) shock with continuation and export the solution as GDX.
+
+    With `endogenize`, the shock targets an endogenous variable (e.g. snLHh) and the named
+    parameter (uDeltag) is freed instance-for-instance to hit it — DREAM's exo/endo swap
+    (see find_swap_pairs); the freed parameter is exported at its solved values.
 
     shock_profile scales the change per year (see profile_weight): the instrument becomes
     level * (1 + (factor - 1) * w(t)) + delta * w(t), with dt counted from the first shock year.
@@ -576,13 +591,20 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
     permille, ETL symbols only) — free data for measuring how linear the response is.
     """
     system = System()
-    window = Window(system, convert_dir, from_year)
-    print(f"window: {len(window.eq_sel):,} equations ({window.n_years} years)")
 
     # A comma-separated --shock-name is a bundle (e.g. 'pM,pXUdl' = DREAM's Udenlandske_priser):
     # every listed instrument gets the same factor/delta/profile.
     matched = [pair for name in split_bundle(shock_name)
                for pair in find_shock_variables_with_years(convert_dir, name, shock_years)]
+    if endogenize:
+        pairs = find_swap_pairs(convert_dir, matched, endogenize)
+        system.swap(np.array([s for s, _, _ in pairs]), np.array([e for _, e, _ in pairs]))
+        matched = [(s, year) for s, _, year in pairs]
+        print(f"swap: {len(pairs)} instances of {shock_name} fixed at their targets, "
+              f"the matching {endogenize} instances freed", flush=True)
+
+    window = Window(system, convert_dir, from_year)
+    print(f"window: {len(window.eq_sel):,} equations ({window.n_years} years)")
     shock_vars = np.array([var_id for var_id, _ in matched])
     first_year = min(year for _, year in matched)
     weights = np.array([profile_weight(shock_profile, year - first_year) for _, year in matched])
@@ -610,6 +632,7 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
         "factor": repr(shock_factor),
         "delta": repr(shock_delta),
         "profile": shock_profile,
+        "endogenized": endogenize,
         "from_year": str(from_year),
         "exported": datetime.date.today().isoformat(),
     }
@@ -1433,6 +1456,53 @@ def find_shock_variables_with_years(convert_dir: Path, name: str,
     return ids
 
 
+def find_swap_pairs(convert_dir: Path, matched: list[tuple[int, int]],
+                    endo_name: str) -> list[tuple[int, int, int]]:
+    """(shock id, endogenised id, year) for DREAM's exo/endo swap.
+
+    Every matched shock instance, e.g. snLHh(40,2030), is paired with the instance of
+    `endo_name` carrying the same domain keys, uDeltag(40,2030); the shock instance is
+    then fixed at its target and the partner freed to absorb it — exactly how
+    standard_shocks.gms implements Arbejdsudbud_beskaeftigelse (`-snLHh, uDeltag`).
+    Matched instances without a partner (aggregates, ages outside a15t100) are dropped.
+    """
+    year_of = dict(matched)
+    shock_keys: dict[int, str] = {}
+    endo_ids: dict[str, int] = {}
+    prefix = endo_name + "("
+    with (convert_dir / "dict.txt").open(encoding="utf-8") as handle:
+        in_vars = False
+        for line in handle:
+            if line.startswith("Variables "):
+                in_vars = True
+                continue
+            if not in_vars:
+                continue
+            parts = line.split()
+            if len(parts) < 2 or parts[0][0] != "x" or not parts[0][1:].isdigit():
+                continue
+            var_id = int(parts[0][1:]) - 1
+            if var_id in year_of:
+                shock_keys[var_id] = parts[1].partition("(")[2]
+            elif parts[1].startswith(prefix):
+                endo_ids[parts[1][len(prefix):]] = var_id
+    pairs = [(shock_id, endo_ids[keys], year_of[shock_id])
+             for shock_id, keys in shock_keys.items() if keys in endo_ids]
+    if not pairs:
+        raise SystemExit(f"no instance of {endo_name!r} shares domain keys with the shock instances")
+    return sorted(pairs)
+
+
+def apply_swap(is_fixed: np.ndarray, fix_ids: np.ndarray, free_ids: np.ndarray) -> None:
+    """Flip the fixed flags of an exo/endo swap in place (checked: no double-fixing/freeing)."""
+    if is_fixed[fix_ids].any():
+        raise SystemExit("swap: a variable to fix is already exogenous")
+    if not is_fixed[free_ids].all():
+        raise SystemExit("swap: a variable to free is already endogenous")
+    is_fixed[fix_ids] = True
+    is_fixed[free_ids] = False
+
+
 SHOCK_PROFILES = ("permanent", "ar", "linear", "blip")
 
 
@@ -1725,6 +1795,10 @@ def main() -> None:
     parser.add_argument("--tol", type=float, default=1e-9)
     parser.add_argument("--lu-method", default="umfpack")
     parser.add_argument("--from-year", type=int, default=2110)
+    parser.add_argument("--endogenize", default="",
+                        help="exo/endo swap: free this parameter instance-for-instance so the "
+                             "(endogenous) --shock-name hits its target, e.g. "
+                             "--shock-name snLHh --endogenize uDeltag")
     parser.add_argument("--shock-profile", choices=SHOCK_PROFILES, default="permanent",
                         help="solve-export: MAKRO standard profile over the shock years "
                              "(permanent | ar = 0.9^dt | linear = 1-0.25dt | blip = first year only)")
@@ -1761,7 +1835,8 @@ def main() -> None:
             years = (int(lo), int(hi or lo))
         cmd_solve_export(parsed.from_year, parsed.shock_name, years, parsed.shock_factor,
                          parsed.shock_delta, parsed.out, parsed.convert_dir, parsed.tol,
-                         export_stages=parsed.export_stages, shock_profile=parsed.shock_profile)
+                         export_stages=parsed.export_stages, shock_profile=parsed.shock_profile,
+                         endogenize=parsed.endogenize)
     else:
         cmd_newton(parsed.perturb, parsed.max_iter, parsed.tol, parsed.from_year, parsed.convert_dir)
 

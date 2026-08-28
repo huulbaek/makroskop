@@ -44,8 +44,11 @@ run Produktionssubsidier_ufin.gdx         --shock-name "rSubYRest(!tot,*)" --sho
 run Importpris_ufin.gdx                   --shock-name pM --shock-years 2030-2129 --shock-factor 1.01
 run Eksportkonkurrerende_priser_ufin.gdx  --shock-name pXUdl --shock-years 2030-2129 --shock-factor 1.01
 run Udenlandske_priser_ufin.gdx           --shock-name "pM,pXUdl" --shock-years 2030-2129 --shock-factor 1.01
-run Arbejdsudbud_beskaeftigelse_ufin.gdx  --shock-name uDeltag --shock-years 2030-2129 --shock-factor 1.01
-run Arbejdsudbud_timer_ufin.gdx           --shock-name uh --shock-years 2030-2129 --shock-factor 1.01
+# Labour supply: DREAM's exo/endo swaps (standard_shocks.gms). uDeltag/uh are DISUTILITY
+# parameters (shLHh = 1/uh; uDeltag on the cost side of the participation FOC), so scaling
+# them up LOWERS labour supply — the first batch-3 runs had the wrong sign (makroskop-6wz).
+run Arbejdsudbud_beskaeftigelse_ufin.gdx  --shock-name snLHh --endogenize uDeltag --shock-years 2030-2129 --shock-factor 1.01
+run Arbejdsudbud_timer_ufin.gdx           --shock-name uh --shock-years 2030-2129 --shock-factor 0.99009900990099   # = 1/1.01 -> shLHh +1 pct. exactly
 run ArbejdsProd_ufin.gdx                  --shock-name "qProdHh_t,qProdxDK" --shock-years 2030-2129 --shock-factor 1.01
 run VirkDisk_ufin.gdx                     --shock-name "rVirkDiskPrem(!spTot,*)" --shock-years 2030-2129 --shock-delta 0.001
 run BoligRisiko_ufin.gdx                  --shock-name rBoligPrem --shock-years 2030-2129 --shock-delta 0.001

@@ -51,6 +51,12 @@ Midlertidige stød: `--shock-profile ar` (0,9^dt — DREAMs AR_profile, filnavn 
 vægter ændringen år for år fra det første stødår; alle varianter er ufinansierede.
 `cloud/run_batch3.sh` kører de midlertidige varianter af de allerede løste stød.
 
+Exo/endo-bytte (DREAMs lukning for arbejdsudbud): `--shock-name snLHh --endogenize uDeltag`
+fastlåser den (endogene) strukturelle beskæftigelse på målet alder for alder og frigiver
+den matchende `uDeltag`-instans, så den rammer det. `uDeltag`/`uh` er ulempeparametre
+(`shLHh = 1/uh`), så at skalere dem *op* sænker arbejdsudbuddet — timer-stødet er derfor
+`--shock-name uh --shock-factor 0.990099` (= 1/1,01).
+
 Bundter: `--shock-name pM,pXUdl` støder flere instrumenter med samme faktor/profil
 (DREAMs `Udenlandske_priser`). Bemærk at `pOlieBrent` næsten ikke bider i
 kalibrerings-konfigurationen (de priser, olieprisen skulle påvirke, er faste datainput);

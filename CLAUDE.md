@@ -119,6 +119,12 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
   tSelskab, tEjd, uG (offentligt forbrug), uvOvfSats (overførsler), uXMarked, nPop
   (single ages), rRenteECB, pOlieBrent (NB: propagates to almost nothing in this
   configuration — needs the foreign-price bundle from standard_shocks.gms).
+- Labour supply (makroskop-6wz): `uDeltag`/`uh` are DISUTILITY parameters — `shLHh = 1/uh`
+  exactly, and `uDeltag` sits on the cost side of the participation FOC — so ×1.01 LOWERS
+  labour supply. DREAM's Arbejdsudbud shocks are exo/endo swaps; reproduce them with
+  `--shock-name snLHh --endogenize uDeltag --shock-factor 1.01` (fixes the target
+  instance-for-instance and frees the parameter; verified +1.0000 % on all ages, 11-year
+  window) and `--shock-name uh --shock-factor 0.990099` (= 1/1.01).
 
 ## Conventions
 
