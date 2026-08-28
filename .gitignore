@@ -31,3 +31,4 @@ etl/*.log
 # beads runtime db (export via bd export is versioned instead)
 .beads/*.db
 .beads/*.db-*
+.playwright-mcp/

@@ -60,6 +60,8 @@ export interface ScenarioDefinition {
 	 *  could not cross. null = the UI default. */
 	maxScale: number | null;
 	maxScaleDa: string | null;
+	/** Plain-language mechanism text for readers, when the catalog has one. */
+	explainerDa?: string | null;
 }
 
 /** Which MAKRO version a scenario was solved on. `source` is "gdx" when the solver

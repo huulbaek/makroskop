@@ -4,7 +4,12 @@
 	import { formatSigned } from '$lib/format';
 	import { loadScenario, type Scenario, type ShockMeta } from '$lib/data';
 	import { page } from '$app/state';
+	import { replaceState } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
+	import {
+		downloadBlob, exportFilename, permalink, provenanceLine, scenarioCsv, svgToPngBlob
+	} from '$lib/export';
 
 	let { data } = $props();
 
@@ -66,6 +71,7 @@
 		selectedVariation = variation;
 		scaleIdx = ALL_SCALE_STEPS.indexOf(UNSCALED);
 		const shock = name === '_demo' ? DEMO : meta.shocks.find((s) => s.name === name);
+		if (name === '_demo' && location.search) replaceState(resolve('/scenarier/'), {});
 		if (!shock || !shock.available.includes(variation)) {
 			override = null;
 			return;
@@ -140,6 +146,89 @@
 
 	const fromYear = $derived(meta.defaultShockYear - 1);
 	const toYear = 2060;
+	const years = $derived(Array.from({ length: meta.yearEnd - meta.yearStart + 1 }, (_, i) => meta.yearStart + i));
+
+	// ------------------------------------------------------------------------------------
+	// Sharing: every solved view is a permalink, and every export carries the source stamp.
+	const shareable = $derived(!!scenario && !scenario.synthetic && selectedName !== '_demo');
+	const closureLabel = $derived(
+		meta.variations.find((v) => v.suffix === selectedVariation)?.labelDa ?? 'Ufinansieret'
+	);
+	const shareUrl = $derived(
+		shareable ? permalink(page.url.origin, { stod: selectedName, variant: selectedVariation, skala: scale }) : ''
+	);
+	const provenance = $derived(
+		provenanceLine({
+			model: scenario?.modelVersion?.name ?? meta.model.name,
+			commit: scenario?.modelVersion?.commit ?? meta.model.commit ?? '',
+			closure: closureLabel,
+			date: __BUILD_DATE__
+		})
+	);
+	/** The scenario in one line, as it appears on exports. */
+	const scenarioLine = $derived.by(() => {
+		const def = scenario?.definition;
+		if (!def) return selectedShock.labelDa;
+		const scaled = scale !== 1 ? ` · ×${daScale.format(scale)} ${mirrored ? 'spejlet' : 'lineær tilnærmelse'}` : '';
+		return `${selectedShock.labelDa}: ${def.changeDa} fra ${def.firstYear}, ${closureLabel.toLowerCase()}${scaled}`;
+	});
+
+	// Keep the address bar in sync, so the URL a reader copies reproduces the view.
+	$effect(() => {
+		if (!shareable) return;
+		const url = new URL(shareUrl);
+		if (url.search !== location.search) replaceState(url, {});
+	});
+
+	let chartSvgs: Record<string, SVGSVGElement | undefined> = $state({});
+	let copied = $state(false);
+	let exporting: string | null = $state(null);
+
+	async function copyLink() {
+		await navigator.clipboard.writeText(shareUrl);
+		copied = true;
+		setTimeout(() => (copied = false), 2000);
+	}
+
+	function downloadCsv() {
+		const csv = scenarioCsv({
+			years,
+			columns: charts.map((c) => ({ key: c.key, label: c.title, unit: c.suffix.trim(), values: c.values })),
+			provenance: [
+				scenarioLine,
+				'Afvigelser fra grundforløbet: pct. for mængder og priser, pct.-point for satser og saldi',
+				provenance,
+				`Kilde: ${shareUrl}`
+			]
+		});
+		// BOM so Excel reads the Danish characters and the decimal commas correctly.
+		downloadBlob(
+			new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }),
+			exportFilename({ stod: selectedName, variant: selectedVariation, key: null, skala: scale, ext: 'csv' })
+		);
+	}
+
+	async function downloadPng(chart: (typeof charts)[number]) {
+		const svg = chartSvgs[chart.key];
+		if (!svg) return;
+		exporting = chart.key;
+		try {
+			const theme = getComputedStyle(document.documentElement);
+			const cssVar = (name: string) => theme.getPropertyValue(name).trim();
+			const blob = await svgToPngBlob(svg, {
+				header: [`${chart.title} — ${chart.unit}`, scenarioLine],
+				footer: [provenance, shareUrl],
+				colors: { background: cssVar('--surface'), ink: cssVar('--ink'), muted: cssVar('--ink-muted') },
+				fonts: { display: cssVar('--font-display'), body: cssVar('--font-body') }
+			});
+			downloadBlob(
+				blob,
+				exportFilename({ stod: selectedName, variant: selectedVariation, key: chart.key, skala: scale, ext: 'png' })
+			);
+		} finally {
+			exporting = null;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -205,6 +294,9 @@
 				</div>
 			{/if}
 		</div>
+		{#if scenario?.definition?.explainerDa}
+			<p class="explainer">{scenario.definition.explainerDa}</p>
+		{/if}
 
 		{#if scenario?.synthetic}
 			<div class="banner" role="note">
@@ -313,6 +405,13 @@
 					/>
 				</div>
 			{/if}
+			{#if shareable}
+				<div class="share-row" role="group" aria-label="Del og hent">
+					<button class="chip" onclick={copyLink}>{copied ? 'Link kopieret ✓' : 'Kopiér link'}</button>
+					<button class="chip" onclick={downloadCsv}>Hent tal (CSV)</button>
+					<span class="share-hint">Linket gengiver præcis denne visning; hver graf kan hentes som PNG med kildeangivelse.</span>
+				</div>
+			{/if}
 			<div class="chart-grid" class:is-demo={scenario.synthetic} style:opacity={loading ? 0.5 : 1}>
 				{#each charts as chart (chart.key)}
 					<div class="card chart-card" class:instrument={chart.isInstrument}>
@@ -323,17 +422,28 @@
 							title={chart.title}
 							code={chart.key}
 							unit={chart.unit}
-							years={Array.from({ length: meta.yearEnd - meta.yearStart + 1 }, (_, i) => meta.yearStart + i)}
+							{years}
 							series={[{ key: chart.key, label: chart.title, values: chart.values }]}
 							fromYear={fromYear}
 							toYear={toYear}
 							zeroLine
 							height={200}
 							suffix={chart.suffix}
+							bind:svg={chartSvgs[chart.key]}
 						/>
+						{#if shareable}
+							<div class="card-tools">
+								<button class="png-btn" onclick={() => downloadPng(chart)} disabled={exporting === chart.key}>
+									{exporting === chart.key ? 'Henter …' : 'Hent PNG'}
+								</button>
+							</div>
+						{/if}
 					</div>
 				{/each}
 			</div>
+			{#if shareable}
+				<p class="kilde">Kilde: {provenance} · <a href={shareUrl}>{shareUrl}</a></p>
+			{/if}
 		{:else}
 			<div class="pending card">
 				<h3>Endnu ikke beregnet</h3>
@@ -689,6 +799,60 @@
 	.hbi-row {
 		max-width: 320px;
 		margin-bottom: 12px;
+	}
+
+	.explainer {
+		max-width: 72ch;
+		font-size: 15px;
+		line-height: 1.5;
+		color: var(--ink-secondary);
+		margin: -4px 0 14px;
+	}
+
+	.share-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 10px;
+	}
+	.share-hint {
+		font-size: 12px;
+		color: var(--ink-muted);
+	}
+
+	.card-tools {
+		display: flex;
+		justify-content: flex-end;
+		margin-top: 4px;
+	}
+	.png-btn {
+		font: inherit;
+		font-size: 11.5px;
+		padding: 2px 8px;
+		border-radius: 999px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--ink-muted);
+		cursor: pointer;
+	}
+	.png-btn:hover:not(:disabled) {
+		color: var(--ink);
+		border-color: var(--ink-muted);
+	}
+	.png-btn:disabled {
+		cursor: progress;
+	}
+
+	.kilde {
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+		color: var(--ink-muted);
+		margin: 12px 0 0;
+		overflow-wrap: anywhere;
+	}
+	.kilde a {
+		color: inherit;
 	}
 
 	.card {

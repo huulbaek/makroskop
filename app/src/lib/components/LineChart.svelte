@@ -20,7 +20,8 @@
 		zeroLine = false,
 		nowLabel = false,
 		height = 240,
-		suffix = ''
+		suffix = '',
+		svg = $bindable<SVGSVGElement | undefined>()
 	}: {
 		title: string;
 		code?: string;
@@ -34,6 +35,8 @@
 		nowLabel?: boolean;
 		height?: number;
 		suffix?: string;
+		/** The rendered <svg>, for PNG export by the parent. */
+		svg?: SVGSVGElement;
 	} = $props();
 
 	let width = $state(640);
@@ -213,7 +216,7 @@
 			tabindex="0"
 			onkeydown={onKeydown}
 		>
-			<svg {width} {height} aria-hidden="true">
+			<svg bind:this={svg} {width} {height} aria-hidden="true">
 				<!-- projection region -->
 				{#if nuVisible}
 					<rect

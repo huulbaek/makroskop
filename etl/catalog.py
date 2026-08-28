@@ -175,6 +175,7 @@ class ShockRun:
     # no solution. None = the UI default.
     max_scale: float | None = None
     max_scale_da: str | None = None  # why the cap is there, shown next to the slider
+    explainer_da: str | None = None  # 2-3 plain-language sentences on the mechanism, for readers
 
 
 _DREAM_GDP_NORM = (
@@ -191,6 +192,10 @@ SHOCK_RUNS: list[ShockRun] = [
              "virksomhedernes afkastkrav), så gennemslaget er 1:1; udenlandske priser er uændrede, "
              "så det er reelt en permanent højere realrente.",
              series_key="rRenteECB",
+             explainer_da="En varigt højere ECB-rente slår 1:1 igennem på alle danske renter. Dyrere lån rammer "
+                          "først boligmarkedet — boligpriserne falder omkring 6 pct. — og dernæst forbrug og "
+                          "investeringer, så BNP ligger 1–1,5 pct. lavere. Beskæftigelsen falder kun det første "
+                          "år: lønnen tilpasser sig, og ledigheden vender tilbage til sit strukturelle niveau.",
              linearity_da="Målt på et 10-års udsnit: ved 64 pct. af stødet afviger modellen 1,1 pct. "
                           "(median) fra lineær skalering; BNP 0,8 pct., beskæftigelse 0,9 pct., "
                           "boligpriser 1,8 pct., enkelte branche-serier op til 6 pct. af effekten."),
@@ -204,20 +209,32 @@ SHOCK_RUNS: list[ShockRun] = [
              1.01, 0.0, "+1 pct.", 2030,
              "Samme bundt og størrelse som DREAMs standardstød \"Udenlandske_priser\": alle eksogene "
              "importpriser pM[s] og udenlandske konkurrentpriser pXUdl[x] hæves 1 pct.; aggregaterne "
-             "er endogene og følger med."),
+             "er endogene og følger med.",
+             explainer_da="Højere import- og konkurrentpriser gør dansk produktion relativt billigere, så eksport "
+                          "og BNP løftes på kort sigt. Over nogle år stiger danske priser og lønninger tilsvarende "
+                          "(ca. 1 pct.), og den reale effekt forsvinder: resultatet er et varigt højere prisniveau, "
+                          "ikke en varig aktivitetsgevinst."),
     ShockRun("Importpris", "pM", "Importpriser (alle varegrupper)", 1.01, 0.0, "+1 pct.", 2030,
              "Samme instrument og størrelse som DREAMs standardstød \"Importpris\"."),
     ShockRun("Eksportkonkurrerende_priser", "pXUdl", "Udenlandske konkurrentpriser på eksportmarkederne",
              1.01, 0.0, "+1 pct.", 2030,
              "Samme instrument og størrelse som DREAMs standardstød \"Eksportkonkurrerende_priser\"."),
-    ShockRun("Bundskat", "tBund", "Bundskattesats", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM),
+    ShockRun("Bundskat", "tBund", "Bundskattesats", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM,
+             explainer_da="En højere bundskat tager af husholdningernes disponible indkomst: det private forbrug "
+                          "falder godt 1 pct., og boligpriserne følger med ned. BNP ender knap 0,2 pct. lavere, mens "
+                          "den offentlige saldo forbedres år for år. Beskæftigelsen påvirkes kun lidt, fordi "
+                          "arbejdsudbuddet i MAKRO er strukturelt bestemt og kun reagerer svagt på skattesatsen."),
     ShockRun("AM_bidrag", "tAMbidrag", "Arbejdsmarkedsbidrag, sats", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM),
     ShockRun("Selskabsskat", "tSelskab", "Selskabsskattesats", 1.0, 0.01, "+1 pct.-point", 2030, _DREAM_GDP_NORM),
     ShockRun("Ejendomsvaerdiskat", "tEjd", "Ejendomsværdiskat, implicit sats", 1.10, 0.0, "+10 pct. af satsen", 2030, _DREAM_GDP_NORM),
     ShockRun("Offentligt_forbrug", "qR(off,*),qE(off,*),hL(off,*),qI_s(!iTot,off,*)",
              "Offentlig sektors input: varekøb, energi, arbejdstimer og investeringer", 1.01, 0.0, "+1 pct.", 2030,
              "Samme instrumenter som DREAMs standardstød (den offentlige produktions eksogene input); "
-             "DREAM normerer ændringen til 1 pct. af BNP, MAKROskop hæver alle input med 1 pct."),
+             "DREAM normerer ændringen til 1 pct. af BNP, MAKROskop hæver alle input med 1 pct.",
+             explainer_da="Mere offentligt forbrug løfter aktivitet og beskæftigelse det første år (BNP +0,1 pct.), "
+                          "men effekten klinger hurtigt af: lønninger og priser stiger og fortrænger privat "
+                          "aktivitet, så BNP-virkningen er omkring nul efter få år. Fordi udgiften ikke er "
+                          "finansieret, vokser underskuddet på de offentlige finanser år for år."),
     ShockRun("Skattepligtig_indkomstoverforsel", "uvOvfSats(!boernyd|boligyd|iskatpl|groen|lumpsumovf,*)",
              "Satser for skattepligtige overførsler (ekskl. de ubeskattede ydelser)", 1.01, 0.0, "+1 pct.", 2030,
              "Samme afgrænsning som DREAMs standardstød (kun skattepligtige ydelser); DREAM normerer "
@@ -270,12 +287,19 @@ SHOCK_RUNS: list[ShockRun] = [
              1.01, 0.0, "+1 pct.", 2030,
              "Samme lukning som DREAMs standardstød: den strukturelle beskæftigelse hæves 1 pct. for hver alder, "
              "og husholdningernes deltagelsesparameter uDeltag frigives alder for alder, så den rammer målet. "
-             "(uDeltag er en ulempeparameter — at hæve den direkte sænker deltagelsen.)"),
+             "(uDeltag er en ulempeparameter — at hæve den direkte sænker deltagelsen.)",
+             explainer_da="Når 1 pct. flere står til rådighed for arbejdsmarkedet, finder de gradvist job: "
+                          "beskæftigelsen er 1 pct. højere efter få år, og BNP vokser med omkring 1 pct. på langt "
+                          "sigt, efterhånden som virksomhedernes kapitalapparat følger med. Lønnen dæmpes i "
+                          "starten, og de offentlige finanser forbedres, fordi flere betaler skat."),
     ShockRun("Arbejdsudbud_timer", "uh", "Timepræferenceparameter (strukturel arbejdstid = 1/uh)",
              1 / 1.01, 0.0, "+1 pct. strukturel arbejdstid", 2030,
              "Samme virkning som DREAMs standardstød: DREAM hæver den strukturelle arbejdstid shLHh 1 pct. og "
              "endogeniserer uh; i modellen er shLHh = 1/uh eksakt, så MAKROskop sætter uh til 1/1,01 gange "
-             "grundforløbets værdi, hvilket giver præcis +1 pct. arbejdstid for alle aldre."),
+             "grundforløbets værdi, hvilket giver præcis +1 pct. arbejdstid for alle aldre.",
+             explainer_da="1 pct. længere arbejdstid pr. beskæftiget giver næsten samme BNP-løft som 1 pct. flere "
+                          "beskæftigede — omkring 1 pct. på langt sigt — uden at antallet af beskæftigede ændrer "
+                          "sig. Timelønnen presses lidt ned i begyndelsen, og den offentlige saldo forbedres."),
     ShockRun("ArbejdsProd", "qProdHh_t,qProdxDK", "Arbejdskraftproduktivitet (trend)", 1.01, 0.0, "+1 pct.", 2030,
              "Samme instrumenter og størrelse som DREAMs standardstød."),
     ShockRun("VirkDisk", "rVirkDiskPrem(!spTot,*)", "Virksomhedernes risikopræmie (hurdle rate)", 1.0, 0.001, "+0,1 pct.-point", 2030,
@@ -342,6 +366,7 @@ def shock_definition(shock_name: str, suffix: str, last_year: int) -> dict | Non
         "linearityDa": run.linearity_da or "Lineariteten er ikke målt for dette stød endnu.",
         "maxScale": run.max_scale,
         "maxScaleDa": run.max_scale_da,
+        "explainerDa": run.explainer_da,
     }
 
 
