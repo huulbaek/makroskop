@@ -56,6 +56,10 @@ export interface ScenarioDefinition {
 	seriesKey: string | null;
 	solver: string;
 	linearityDa: string;
+	/** Largest |scale| the slider may offer, where the model has a boundary the solver
+	 *  could not cross. null = the UI default. */
+	maxScale: number | null;
+	maxScaleDa: string | null;
 }
 
 /** Which MAKRO version a scenario was solved on. `source` is "gdx" when the solver

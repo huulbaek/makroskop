@@ -20,13 +20,32 @@
 
 	let selectedName = $state('_demo');
 	let selectedVariation = $state('');
-	/** Client-side linear rescaling of a solved scenario (1 = as solved). */
-	let scale = $state(1);
-	const SCALE_STEPS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 	const daScale = new Intl.NumberFormat('da-DK', { maximumFractionDigits: 2 });
 	let override: Scenario | null | 'unset' = $state.raw('unset');
 	let loading = $state(false);
 	const scenario = $derived(override === 'unset' ? data.initialScenario : override);
+
+	/** Client-side linear rescaling of a solved scenario (1 = as solved).
+	 *  Negative steps mirror the shock: the catalog only holds increases, so a cut is
+	 *  shown by flipping the deviations. That is a first-order extrapolation to the other
+	 *  side of the baseline — no worse than the ×2 we already allow, but it is labelled. */
+	const ALL_SCALE_STEPS = [-1, -0.75, -0.5, -0.25, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+	const UNSCALED = 1;
+	/** Steps this scenario allows. Where the model has a boundary the solver could not
+	 *  cross, the catalog caps how far we may extrapolate (`maxScale`); the cap is on the
+	 *  magnitude, so it trims the mirrored side too. */
+	const scaleSteps = $derived.by(() => {
+		const cap = scenario?.definition?.maxScale;
+		const steps = cap == null ? ALL_SCALE_STEPS : ALL_SCALE_STEPS.filter((s) => Math.abs(s) <= cap);
+		return steps.includes(UNSCALED) ? steps : [...steps, UNSCALED].sort((a, b) => a - b);
+	});
+	let scaleIdx = $state(ALL_SCALE_STEPS.indexOf(UNSCALED));
+	/** scaleIdx indexes scaleSteps, which shrinks when a scenario carries a cap. */
+	const boundedIdx = $derived(
+		scaleIdx >= 0 && scaleIdx < scaleSteps.length ? scaleIdx : scaleSteps.indexOf(UNSCALED)
+	);
+	const scale = $derived(scaleSteps[boundedIdx]);
+	const mirrored = $derived(scale < 0);
 
 	const selectedShock = $derived(
 		selectedName === '_demo' ? DEMO : (meta.shocks.find((s) => s.name === selectedName) ?? DEMO)
@@ -45,7 +64,7 @@
 	async function select(name: string, variation: string) {
 		selectedName = name;
 		selectedVariation = variation;
-		scale = 1;
+		scaleIdx = ALL_SCALE_STEPS.indexOf(UNSCALED);
 		const shock = name === '_demo' ? DEMO : meta.shocks.find((s) => s.name === name);
 		if (!shock || !shock.available.includes(variation)) {
 			override = null;
@@ -67,7 +86,7 @@
 			: (shock.available[0] ?? meta.variations[1]?.suffix ?? '_midl');
 		const wantedScale = Number(page.url.searchParams.get('skala'));
 		void select(shock.name, variation).then(() => {
-			if (SCALE_STEPS.includes(wantedScale)) scale = wantedScale;
+			if (scaleSteps.includes(wantedScale)) scaleIdx = scaleSteps.indexOf(wantedScale);
 		});
 	});
 
@@ -241,20 +260,34 @@
 							id="scale"
 							type="range"
 							min="0"
-							max={SCALE_STEPS.length - 1}
+							max={scaleSteps.length - 1}
 							step="1"
-							value={SCALE_STEPS.indexOf(scale)}
-							oninput={(e) => (scale = SCALE_STEPS[Number(e.currentTarget.value)])}
-							aria-valuetext={`${daScale.format(scale)} gange stødet`}
+							bind:value={scaleIdx}
+							aria-valuetext={`${daScale.format(scale)} gange stødet${mirrored ? ' — spejlet, altså en lempelse' : ''}`}
 						/>
 						<output for="scale" class="scale-readout">
-							<strong>×{daScale.format(scale)}</strong> = {scaledChange}
-							{#if scale !== 1}<span class="approx">lineær tilnærmelse</span>{/if}
+							<span class="scale-value"><strong>×{daScale.format(scale)}</strong> = {scaledChange}</span>
+							<!-- Always rendered: the badge sits next to the slider, so popping it in and out
+							     would resize the track mid-drag. -->
+							<span class="approx" class:blank={scale === 1} class:mirror={mirrored}>
+								{mirrored ? 'spejlet' : 'lineær tilnærmelse'}
+							</span>
 						</output>
 						<p class="scale-note">
 							Kurverne skaleres i browseren — det er <em>ikke</em> en ny modelkørsel. Modellen er
 							tæt på lineær for stød af denne størrelse, men ikke helt: {def.linearityDa}
 						</p>
+						{#if mirrored}
+							<p class="scale-note mirror-note">
+								<strong>Negativ skala spejler stødet.</strong> Kataloget indeholder kun forhøjelser,
+								så en lempelse vises ved at vende fortegnet på afvigelserne. Det er en lineær
+								tilnærmelse på den anden side af grundforløbet — retningen er rigtig, men størrelsen
+								er ikke løst i modellen. En rigtig nedsættelse kræver en ny modelkørsel.
+							</p>
+						{/if}
+						{#if def.maxScaleDa}
+							<p class="scale-note">{def.maxScaleDa}</p>
+						{/if}
 					</div>
 				{/if}
 			</section>
@@ -285,7 +318,7 @@
 					<div class="card chart-card" class:instrument={chart.isInstrument}>
 						{#if scenario.synthetic}<span class="demo-badge" aria-hidden="true">DEMO</span>{/if}
 						{#if chart.isInstrument}<span class="instrument-badge">Stødet (input)</span>{/if}
-						{#if scale !== 1 && !chart.isInstrument}<span class="scaled-badge">×{daScale.format(scale)} tilnærmet</span>{/if}
+						{#if scale !== 1 && !chart.isInstrument}<span class="scaled-badge">×{daScale.format(scale)} {mirrored ? 'spejlet' : 'tilnærmet'}</span>{/if}
 						<LineChart
 							title={chart.title}
 							code={chart.key}
@@ -418,7 +451,10 @@
 		padding-top: 12px;
 		border-top: 1px solid var(--grid);
 		display: grid;
-		grid-template-columns: max-content 1fr max-content;
+		/* Both flexible columns are content-independent on purpose: with a max-content
+		   readout the track resized as the readout text changed, and a track that
+		   changes width mid-drag makes the thumb slide out from under the pointer. */
+		grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr);
 		gap: 4px 14px;
 		align-items: center;
 		font-size: 13px;
@@ -435,11 +471,31 @@
 
 	.scale-readout {
 		font-variant-numeric: tabular-nums;
+	}
+
+	.scale-readout .scale-value {
 		white-space: nowrap;
+	}
+
+	.scale-readout .approx.blank {
+		visibility: hidden;
+	}
+
+	.scale-readout .approx.mirror {
+		color: var(--bad);
+	}
+
+	.mirror-note {
+		color: var(--ink-secondary);
+	}
+
+	.mirror-note strong {
+		color: var(--bad);
 	}
 
 	.scale-readout .approx {
 		margin-left: 6px;
+		white-space: nowrap;
 		font-family: var(--font-mono);
 		font-size: 10px;
 		text-transform: uppercase;

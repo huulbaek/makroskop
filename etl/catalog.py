@@ -170,6 +170,11 @@ class ShockRun:
     dream_da: str
     series_key: str | None = None  # SERIES key of the instrument, if it is a catalog series
     linearity_da: str | None = None  # measured nonlinearity (nonlinearity.py), if known
+    # Largest |scale| the UI may offer. Set it where the model itself has a boundary the
+    # solver could not cross, so the slider cannot extrapolate past a point we know has
+    # no solution. None = the UI default.
+    max_scale: float | None = None
+    max_scale_da: str | None = None  # why the cap is there, shown next to the slider
 
 
 _DREAM_GDP_NORM = (
@@ -247,7 +252,11 @@ SHOCK_RUNS: list[ShockRun] = [
              "DREAM ændrer både top- og lavsatsen normeret til 1 pct. af BNP; i denne konfiguration er kun topsatsen en variabel."),
     ShockRun("Moms", "tMoms_y,tMoms_m", "Momssatser (indenlandsk og importeret)", 1.0, 0.005, "+0,5 pct.-point", 2030,
              _DREAM_GDP_NORM + " Stødet er halveret i forhold til de øvrige satsstød: ved ca. 0,9 pct.-point rammer "
-             "de 18-åriges ejerboligbeholdning omkring 2110 nul, og modellen har ingen håndtering af den grænse."),
+             "de 18-åriges ejerboligbeholdning omkring 2110 nul, og modellen har ingen håndtering af den grænse.",
+             max_scale=1.5,
+             max_scale_da="Opskaleringen stopper ved ×1,5 (+0,75 pct.-point): omkring +0,9 pct.-point rammer de "
+                          "18-åriges ejerboligbeholdning nul ca. 2110, og der har modellen ingen løsning at "
+                          "tilnærme sig imod. Nedad gælder grænsen ikke."),
     ShockRun("Registreringsafgift", "tReg_y,tReg_m", "Registreringsafgift, implicitte satser", 1.10, 0.0, "+10 pct. af satsen", 2030, _DREAM_GDP_NORM),
     ShockRun("Energiafgift", "tAfg_y(cEne,*,*),tAfg_m(cEne,*,*)", "Energiafgifter på privat forbrug", 1.10, 0.0, "+10 pct. af satsen", 2030, _DREAM_GDP_NORM),
     ShockRun("Forbrugsafgift", "tAfg_y(cVar,*,*),tAfg_m(cVar,*,*)", "Øvrige afgifter på privat vareforbrug", 1.10, 0.0, "+10 pct. af satsen", 2030, _DREAM_GDP_NORM),
@@ -331,6 +340,8 @@ def shock_definition(shock_name: str, suffix: str, last_year: int) -> dict | Non
         "seriesKey": run.series_key,
         "solver": "MAKROskops frie løser (Newton, fuld horisont)",
         "linearityDa": run.linearity_da or "Lineariteten er ikke målt for dette stød endnu.",
+        "maxScale": run.max_scale,
+        "maxScaleDa": run.max_scale_da,
     }
 
 
