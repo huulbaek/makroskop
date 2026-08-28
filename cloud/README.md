@@ -57,6 +57,12 @@ den matchende `uDeltag`-instans, så den rammer det. `uDeltag`/`uh` er ulempepar
 (`shLHh = 1/uh`), så at skalere dem *op* sænker arbejdsudbuddet — timer-stødet er derfor
 `--shock-name uh --shock-factor 0.990099` (= 1/1,01).
 
+Finansierede varianter (DREAMs `perm`): `--closure tax-reaction` frigiver lukkeskat-provenuet
+`vtLukning(tot,t)`, holder satsen `tLukning` konstant fra stødåret og fastholder den offentlige
+nettoformue i pct. af BNP i 2129 på referencens niveau (`shock_template.gms`,
+`B_fiscal_reaction`) — 100 lineære ligninger lagt oven på det parsede system. Filnavn `_perm.gdx`;
+`cloud/run_batch4.sh` kører alle 38 stød sådan.
+
 Bundter: `--shock-name pM,pXUdl` støder flere instrumenter med samme faktor/profil
 (DREAMs `Udenlandske_priser`). Bemærk at `pOlieBrent` næsten ikke bider i
 kalibrerings-konfigurationen (de priser, olieprisen skulle påvirke, er faste datainput);

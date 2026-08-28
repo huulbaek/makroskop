@@ -355,8 +355,8 @@ _UNFINANCED = (
     "derfor over tid og er ikke et holdbart forløb."
 )
 _UNFINANCED_TEMP = (
-    "Ufinansieret: ingen skattesats reagerer. (DREAMs tilsvarende variant er finansieret via "
-    "den beregningstekniske lukkeskat — det kan den frie løser ikke endnu.)"
+    "Ufinansieret: ingen skattesats reagerer. (DREAM løser de midlertidige varianter med "
+    "lukkeskat-reaktionen; MAKROskop løser dem indtil videre ufinansieret.)"
 )
 
 # Profiles follow Analysis/Standard_shocks/standard_shocks.gms: dt = år siden stødåret.

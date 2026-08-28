@@ -125,6 +125,11 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
   `--shock-name snLHh --endogenize uDeltag --shock-factor 1.01` (fixes the target
   instance-for-instance and frees the parameter; verified +1.0000 % on all ages, 11-year
   window) and `--shock-name uh --shock-factor 0.990099` (= 1/1.01).
+- Financed closure (makroskop-b8o): in the calibration zip `tLukning` is FREE (=0) and the revenue
+  `vtLukning(tot,t)` is data-fixed — not the other way round. `--closure tax-reaction` frees
+  vtLukning and appends DREAM's two linear equations (tLukning[t] = tLukning[2129]; vOff13Net/vBNP
+  at 2129 = reference) as `ExtraEquations` rows on the Window (`window.residuals/jacobian_csc`);
+  the last model year is 2129, not 2130. `System.jacobian_csc` shape follows `len(free_ids)`.
 
 ## Conventions
 

@@ -453,7 +453,7 @@ class System:
         keep = ~self.is_fixed[cols]
         matrix = sparse.coo_matrix(
             (vals[keep], (rows[keep], self.free_index[cols[keep]])),
-            shape=(self.n_eq, self.n_eq),
+            shape=(self.n_eq, len(self.free_ids)),
         )
         return matrix.tocsc()
 
@@ -576,7 +576,8 @@ def export_solution_gdx(convert_dir: Path, x: np.ndarray, out_path: Path,
 def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, int] | None,
                      shock_factor: float, shock_delta: float, out_path: Path,
                      convert_dir: Path, tol: float, export_stages: bool = False,
-                     shock_profile: str = "permanent", endogenize: str = "") -> None:
+                     shock_profile: str = "permanent", endogenize: str = "",
+                     closure: str = "none") -> None:
     """Solve a (possibly multi-year) shock with continuation and export the solution as GDX.
 
     With `endogenize`, the shock targets an endogenous variable (e.g. snLHh) and the named
@@ -603,7 +604,8 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
         print(f"swap: {len(pairs)} instances of {shock_name} fixed at their targets, "
               f"the matching {endogenize} instances freed", flush=True)
 
-    window = Window(system, convert_dir, from_year)
+    extra = tax_reaction_closure(system, convert_dir, from_year) if closure == "tax-reaction" else None
+    window = Window(system, convert_dir, from_year, extra)
     print(f"window: {len(window.eq_sel):,} equations ({window.n_years} years)")
     shock_vars = np.array([var_id for var_id, _ in matched])
     first_year = min(year for _, year in matched)
@@ -633,6 +635,7 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
         "delta": repr(shock_delta),
         "profile": shock_profile,
         "endogenized": endogenize,
+        "closure": closure,
         "from_year": str(from_year),
         "exported": datetime.date.today().isoformat(),
     }
@@ -647,8 +650,8 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
     checkpoint_path = CACHE_DIR / f"ckpt_{out_path.stem}.npz"
     solve_shock(system, window, x, shock_vars, targets, tol=tol, checkpoint_path=checkpoint_path,
                 on_stage=write_stage if export_stages else None)
-    residual = np.empty(system.n_eq)
-    system.residuals(x, residual)
+    residual = np.empty(window.n_eq_total)
+    window.residuals(x, residual)
     print(f"solved: ||r||_inf = {np.abs(residual[window.eq_sel]).max():.3e}")
     print(f"peak RSS this process: {peak_rss_gb():.1f} GB")
     export_solution_gdx(convert_dir, x, out_path, meta={**meta, "share": "1.0"})
@@ -1103,21 +1106,125 @@ def load_pole_jterms(convert_dir: Path, is_fixed: np.ndarray) -> tuple[np.ndarra
     return eqs, variables
 
 
+class ExtraEquations:
+    """Linear equations appended to the parsed system: residual = A·x − b, one year per row.
+
+    Used for closures that MAKRO's scalar zip does not contain (DREAM adds them in GAMS at
+    shock time). Rows are indexed n_eq, n_eq+1, ... in the window.
+    """
+
+    def __init__(self, rows: list[tuple[dict[int, float], float, int, str]], n_vars: int):
+        from scipy import sparse
+
+        self.n = len(rows)
+        data, r_idx, c_idx = [], [], []
+        for k, (coeffs, _, _, _) in enumerate(rows):
+            for var_id, coeff in coeffs.items():
+                data.append(coeff)
+                r_idx.append(k)
+                c_idx.append(var_id)
+        self.matrix = sparse.csr_matrix((data, (r_idx, c_idx)), shape=(self.n, n_vars))
+        self.rhs = np.array([rhs for _, rhs, _, _ in rows], dtype=np.float64)
+        self.years = np.array([year for _, _, year, _ in rows], dtype=np.int64)
+        self.names = [name for _, _, _, name in rows]
+
+    def residuals(self, x: np.ndarray) -> np.ndarray:
+        return self.matrix @ x - self.rhs
+
+    def jacobian_free(self, free_ids: np.ndarray):
+        """The constant Jacobian restricted to the free-variable columns (CSC)."""
+        return self.matrix[:, free_ids].tocsc()
+
+
+def build_tax_reaction(ids: dict[str, int], levels: np.ndarray, n_vars: int,
+                       first_year: int, last_year: int) -> tuple[ExtraEquations, np.ndarray]:
+    """DREAM's financed closure (shock_template.gms B_fiscal_reaction) as extra equations.
+
+    vtLukning[aTot,t] — the lukkeskat revenue, data-fixed in the calibration zip — is freed for
+    first_year..last_year, and in exchange: tLukning[t] = tLukning[last_year] for every year but
+    the last, and vOff13Net/vBNP at last_year equals the reference ratio (public net worth to GDP
+    unchanged at the horizon). Returns (equations, ids to unfix).
+    """
+    def lookup(name: str) -> int:
+        try:
+            return ids[name]
+        except KeyError:
+            raise SystemExit(f"closure: variable {name!r} not found in the system") from None
+
+    years = list(range(first_year, last_year + 1))
+    unfix = np.array([lookup(f"vtLukning(tot,{t})") for t in years])
+    end_rate = lookup(f"tLukning({last_year})")
+    rows: list[tuple[dict[int, float], float, int, str]] = [
+        ({lookup(f"tLukning({t})"): 1.0, end_rate: -1.0}, 0.0, t, f"closure:tLukning({t})=tLukning({last_year})")
+        for t in years[:-1]
+    ]
+    net_worth, gdp = lookup(f"vOff13Net({last_year})"), lookup(f"vBNP({last_year})")
+    ratio = float(levels[net_worth] / levels[gdp])
+    rows.append(({net_worth: 1.0, gdp: -ratio}, 0.0, last_year,
+                 f"closure:vOff13Net({last_year})={ratio:.4f}*vBNP({last_year})"))
+    return ExtraEquations(rows, n_vars), unfix
+
+
+LAST_MODEL_YEAR = 2129
+
+
+def variable_ids(convert_dir: Path, wanted: set[str]) -> dict[str, int]:
+    """dict.txt names -> 0-based x indices for a set of exact instance names."""
+    found: dict[str, int] = {}
+    with (convert_dir / "dict.txt").open(encoding="utf-8") as handle:
+        in_vars = False
+        for line in handle:
+            if line.startswith("Variables "):
+                in_vars = True
+                continue
+            if not in_vars:
+                continue
+            parts = line.split()
+            if len(parts) >= 2 and parts[1] in wanted:
+                found[parts[1]] = int(parts[0][1:]) - 1
+                if len(found) == len(wanted):
+                    break
+    return found
+
+
+def tax_reaction_closure(system: "System", convert_dir: Path, from_year: int) -> ExtraEquations:
+    """Apply DREAM's tax reaction to the system (unfix vtLukning) and return its equations."""
+    first_year = from_year + 1  # the window's first year is pre-shock, as in DREAM (shock_year-1)
+    years = range(first_year, LAST_MODEL_YEAR + 1)
+    wanted = {f"vtLukning(tot,{t})" for t in years} | {f"tLukning({t})" for t in years}
+    wanted |= {f"vOff13Net({LAST_MODEL_YEAR})", f"vBNP({LAST_MODEL_YEAR})"}
+    ids = variable_ids(convert_dir, wanted)
+    extra, unfix = build_tax_reaction(ids, system.levels, len(system.levels), first_year, LAST_MODEL_YEAR)
+    if not system.is_fixed[unfix].all():
+        raise SystemExit("closure: vtLukning(tot,t) is not exogenous in this system")
+    system.is_fixed[unfix] = False
+    system._index_free()
+    print(f"closure: tax reaction — freed {len(unfix)} vtLukning instances, added {extra.n} equations "
+          f"(tLukning constant from {first_year}, {extra.names[-1][8:]})", flush=True)
+    return extra
+
+
 class Window:
     """A trailing time-window of the system: equations/free vars with year >= from_year.
 
     The pole j-term equations (POLE_JTERMS) are excluded and their j-terms frozen.
     """
 
-    def __init__(self, system: System, convert_dir: Path, from_year: int):
+    def __init__(self, system: System, convert_dir: Path, from_year: int,
+                 extra: ExtraEquations | None = None):
+        self.system = system
+        self.extra = extra
         self.convert_dir = convert_dir
         self.from_year = from_year
         self.n_years = 2130 - from_year
+        self.n_eq_total = system.n_eq + (extra.n if extra is not None else 0)
         eq_year, var_year = load_years(convert_dir, system.n_eq, len(system.levels))
+        if extra is not None:
+            eq_year = np.concatenate([eq_year, extra.years])
         self.eq_year = eq_year
         self.var_year = var_year
         drop_eqs, freeze_vars = load_pole_jterms(convert_dir, system.is_fixed)
-        keep_eq = np.ones(system.n_eq, dtype=bool)
+        keep_eq = np.ones(self.n_eq_total, dtype=bool)
         keep_eq[drop_eqs] = False
         keep_var = np.ones(len(system.levels), dtype=bool)
         keep_var[freeze_vars] = False
@@ -1139,8 +1246,24 @@ class Window:
 
     def in_window_eq_mask(self, n_eq: int) -> np.ndarray:
         mask = np.zeros(n_eq, dtype=bool)
-        mask[self.eq_sel] = True
+        mask[self.eq_sel[self.eq_sel < n_eq]] = True
         return mask
+
+    def residuals(self, x: np.ndarray, out: np.ndarray) -> np.ndarray:
+        """System residuals followed by the closure's extra rows (out has n_eq_total entries)."""
+        n_eq = self.system.n_eq
+        self.system.residuals(x, out[:n_eq])
+        if self.extra is not None:
+            out[n_eq:] = self.extra.residuals(x)
+        return out
+
+    def jacobian_csc(self, x: np.ndarray):
+        """Jacobian on free columns, with the closure's constant rows appended."""
+        jac = self.system.jacobian_csc(x)
+        if self.extra is None:
+            return jac
+        from scipy import sparse
+        return sparse.vstack([jac, self.extra.jacobian_free(self.system.free_ids)]).tocsc()
 
 
 # Test hook: skip the residual-based acceptance so every full step goes through the
@@ -1151,8 +1274,11 @@ _FORCE_LOOKAHEAD = os.environ.get("FREESOLVER_TEST_FORCE_LOOKAHEAD") == "1"
 def worst_residuals(window: "Window", residual_full: np.ndarray, top: int = 5) -> str:
     """Name the equations behind the largest window residuals (diagnostic for rejected steps)."""
     sel = window.eq_sel
+    n_eq = window.system.n_eq
     order = np.argsort(-np.abs(residual_full[sel]))[:top]
-    names = equation_names(window.convert_dir, {int(sel[i]) + 1 for i in order})
+    names = equation_names(window.convert_dir, {int(sel[i]) + 1 for i in order if sel[i] < n_eq})
+    if window.extra is not None:
+        names.update({int(sel[i]) + 1: window.extra.names[int(sel[i]) - n_eq] for i in order if sel[i] >= n_eq})
     return ", ".join(f"{names.get(int(sel[i]) + 1, '?')}={residual_full[sel[i]]:.2e}" for i in order)
 
 
@@ -1164,8 +1290,8 @@ def solve_window(system: System, window: Window, x: np.ndarray,
     fresh Jacobian whenever progress is poor — cheap on continuation ladders where the
     Jacobian barely changes between stages.
     """
-    residual_full = np.empty(system.n_eq)
-    system.residuals(x, residual_full)
+    residual_full = np.empty(window.n_eq_total)
+    window.residuals(x, residual_full)
     norm = np.abs(residual_full[window.eq_sel]).max()
     print(f"start: ||r||_inf = {norm:.3e}", flush=True)
     lu = lu_reuse
@@ -1178,7 +1304,7 @@ def solve_window(system: System, window: Window, x: np.ndarray,
             break
         t0 = time.time()
         if lu is None:
-            jac = system.jacobian_csc(x)
+            jac = window.jacobian_csc(x)
             jac_window = jac[window.eq_perm, :][:, window.var_perm].tocsc()
             lu = (make_direct_solver(jac_window), jac_window)
             fresh = True
@@ -1215,7 +1341,7 @@ def solve_window(system: System, window: Window, x: np.ndarray,
         for _ in range(8):
             x_try = x.copy()
             x_try[window.window_vars_sorted] += alpha * dx
-            system.residuals(x_try, residual_full)
+            window.residuals(x_try, residual_full)
             trial_norm = np.abs(residual_full[window.eq_sel]).max()
             if not _FORCE_LOOKAHEAD and np.isfinite(trial_norm) and (
                     trial_norm < norm or (alpha == 1.0 and trial_norm < reference)):
@@ -1234,7 +1360,7 @@ def solve_window(system: System, window: Window, x: np.ndarray,
                 dx2 = linear_solve(-residual_full[window.eq_perm])
                 x_next = x_try.copy()
                 x_next[window.window_vars_sorted] += dx2
-                system.residuals(x_next, residual_full)
+                window.residuals(x_next, residual_full)
                 next_norm = np.abs(residual_full[window.eq_sel]).max()
                 if np.isfinite(next_norm) and next_norm < norm:
                     print(f"  look-ahead: full step -> {trial_norm:.3e} (allowance {reference:.1e}), "
@@ -1248,7 +1374,7 @@ def solve_window(system: System, window: Window, x: np.ndarray,
                 print(f"  worst residual (follow-up): {worst_residuals(window, residual_full)}", flush=True)
             alpha *= 0.5
         if not accepted:
-            system.residuals(x, residual_full)  # restore residual at x
+            window.residuals(x, residual_full)  # restore residual at x
             if fresh:
                 print(f"  line search failed with fresh Jacobian (factor {factor_time:.1f}s); stopping",
                       flush=True)
@@ -1294,10 +1420,10 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.nd
     previous: tuple[float, np.ndarray] | None = None  # the converged stage before `checkpoint`
     lu = None
     attempts = 0
-    residual = np.empty(system.n_eq)
+    residual = np.empty(window.n_eq_total)
 
     def start_norm(point: np.ndarray) -> float:
-        system.residuals(point, residual)
+        window.residuals(point, residual)
         return float(np.abs(residual[window.eq_sel]).max())
 
     def save_checkpoint() -> None:
@@ -1504,6 +1630,7 @@ def apply_swap(is_fixed: np.ndarray, fix_ids: np.ndarray, free_ids: np.ndarray) 
 
 
 SHOCK_PROFILES = ("permanent", "ar", "linear", "blip")
+CLOSURES = ("none", "tax-reaction")
 
 
 def profile_weight(profile: str, years_since_start: int) -> float:
@@ -1799,6 +1926,9 @@ def main() -> None:
                         help="exo/endo swap: free this parameter instance-for-instance so the "
                              "(endogenous) --shock-name hits its target, e.g. "
                              "--shock-name snLHh --endogenize uDeltag")
+    parser.add_argument("--closure", choices=CLOSURES, default="none",
+                        help="'tax-reaction' = DREAM's financed variant (_perm): vtLukning freed, "
+                             "tLukning constant from the shock year, public net worth/GDP unchanged at the horizon")
     parser.add_argument("--shock-profile", choices=SHOCK_PROFILES, default="permanent",
                         help="solve-export: MAKRO standard profile over the shock years "
                              "(permanent | ar = 0.9^dt | linear = 1-0.25dt | blip = first year only)")
@@ -1836,7 +1966,7 @@ def main() -> None:
         cmd_solve_export(parsed.from_year, parsed.shock_name, years, parsed.shock_factor,
                          parsed.shock_delta, parsed.out, parsed.convert_dir, parsed.tol,
                          export_stages=parsed.export_stages, shock_profile=parsed.shock_profile,
-                         endogenize=parsed.endogenize)
+                         endogenize=parsed.endogenize, closure=parsed.closure)
     else:
         cmd_newton(parsed.perturb, parsed.max_iter, parsed.tol, parsed.from_year, parsed.convert_dir)
 
