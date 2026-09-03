@@ -70,9 +70,9 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 - `etl/` — Python (uv). `extract.py` writes `app/static/data/*.json` from GDX files.
   `freesolver.py` is the license-free solver: parse / check / jacobian / newton /
   oracle / solve-export / export-baseline. Cache in `etl/cache/` (regenerable).
-- Deploy: `Dockerfile` (bun build → nginx) as a Dokploy Application on the `nodalit` host
-  (ssh alias; UI ployduck.nodalit.com), domain makroskop.nodalit.com; push to `main` redeploys.
-- `cloud/` — Hetzner box workflow: `pack.sh` (local bundle) → `setup.sh` → `run.sh` /
+- Deploy: `Dockerfile` (bun build → nginx), built by a Dockerfile-based PaaS from this repo;
+  push to `main` redeploys the public instance. Host details: `bd memories deploy`.
+- `cloud/` — rented-box workflow: `pack.sh` (local bundle) → `setup.sh` → `run.sh` /
   `run_batch2.sh` (checkpointed, resumable scenario batches). See `cloud/README.md`.
 
 ## Critical knowledge (learned the hard way)
@@ -80,8 +80,8 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 - Solver scenarios MUST be compared against `etl/shock_gdx/_reference.gdx` (the zip's
   calibration point), never `baseline.gdx` — they differ 0.3–9% on levels. extract.py
   handles this automatically when `_reference.gdx` exists.
-- Full-horizon (2.2M eq) direct factorization needs ~64GB → rented Hetzner box
-  (CCX43/53, x86, Ubuntu). A 16GB laptop manages ≤ ~12-year windows.
+- Full-horizon (2.2M eq) direct factorization needs ~64GB → rented x86 Ubuntu box
+  (see `cloud/README.md`). A 16GB laptop manages ≤ ~12-year windows.
 - Linear solvers: verified backend chain in `make_direct_solver` (Pardiso probe-tested,
   falls back to UMFPACK/kvxopt — the reliable workhorse — then SuperLU). Never trust an
   unverified Pardiso factorization. Rows are equilibrated; refinement runs to 1e-11.

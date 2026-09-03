@@ -1,7 +1,8 @@
 /** Sharing helpers for the scenario page: permalinks, provenance stamps, CSV and PNG export.
  *  The pure functions are unit-tested; the DOM/canvas ones are verified in the browser. */
 
-export const SITE_HOST = 'makroskop.nodalit.com';
+/** Host shown in provenance stamps; override with VITE_SITE_HOST when self-hosting. */
+export const SITE_HOST: string = import.meta.env.VITE_SITE_HOST ?? 'makroskop.nodalit.com';
 
 export interface PermalinkParams {
 	stod: string;

@@ -32,3 +32,6 @@ etl/*.log
 .beads/*.db
 .beads/*.db-*
 .playwright-mcp/
+
+# beads audit log (append-only interaction log, local-only)
+.beads/interactions.jsonl
