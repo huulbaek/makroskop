@@ -468,8 +468,9 @@
 				procentpoint for satser og saldi. Stødet lægges ind i {meta.defaultShockYear}; den nøjagtige
 				størrelse og hvad der ændres, står i boksen "Sådan er stødet defineret" for hvert beregnet
 				scenarie. Varianterne følger MAKROs standardprofiler: et enkelt år, midlertidigt aftrappet
-				(AR-profil), permanent finansieret og permanent ufinansieret — indtil videre er kun de
-				ufinansierede varianter løst.
+				(AR-profil), permanent finansieret (den beregningstekniske lukkeskat reagerer, som i DREAMs
+				egne beregninger) og permanent ufinansieret. De midlertidige varianter er indtil videre
+				ufinansierede.
 			</p>
 		</div>
 	</div>
