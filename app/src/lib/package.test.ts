@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
 	ALL_SCALE_STEPS,
+	financedCostLine,
+	unfinancedCostLine,
 	gdpPpToKr,
 	packageLine,
 	packageQuery,
@@ -102,5 +104,48 @@ describe('packageLine', () => {
 				'Permanent, finansieret'
 			)
 		).toBe('Pakke: Bundskat ×-1 (-1 pct.-point, spejlet) + Offentligt forbrug ×0,5 (+0,5 pct.) — permanent, finansieret');
+	});
+});
+
+describe('unfinancedCostLine', () => {
+	it('says what the package costs the public finances, rounded like the table', () => {
+		expect(unfinancedCostLine(2035, -0.34, -15.62)).toBe(
+			'I 2035 koster pakken de offentlige finanser ca. 15,6 mia. kr. om året (-0,34 pct.-point af BNP).'
+		);
+	});
+	it('says what the package gives', () => {
+		expect(unfinancedCostLine(2035, 0.02, 0.92)).toBe(
+			'I 2035 giver pakken de offentlige finanser ca. 0,92 mia. kr. om året (+0,02 pct.-point af BNP).'
+		);
+	});
+	it('shows a small amount the table also shows, with the pct.-point rounded to 0', () => {
+		expect(unfinancedCostLine(2035, 0.001, 0.03)).toBe(
+			'I 2035 giver pakken de offentlige finanser ca. 0,03 mia. kr. om året (0 pct.-point af BNP).'
+		);
+	});
+	it('calls the package neutral only when the kr. round to zero', () => {
+		expect(unfinancedCostLine(2035, 0.0001, 0.004)).toBe('I 2035 er pakken omtrent neutral for de offentlige finanser.');
+		expect(unfinancedCostLine(2035, -0.0001, -0.004)).toBe('I 2035 er pakken omtrent neutral for de offentlige finanser.');
+	});
+	it('returns an empty string without numbers', () => {
+		expect(unfinancedCostLine(2035, null, null)).toBe('');
+		expect(unfinancedCostLine(2035, -0.3, null)).toBe('');
+	});
+});
+
+describe('financedCostLine', () => {
+	it('states the closure tax change without claiming the yearly saldo is unchanged', () => {
+		expect(financedCostLine(1.46)).toBe(
+			'Finansieret: lukkeskatten skal hæves 1,46 pct.-point, for at de offentlige finanser forbliver holdbare på langt sigt.'
+		);
+		expect(financedCostLine(-0.7)).toBe(
+			'Finansieret: pakken giver råderum – lukkeskatten kan sænkes 0,7 pct.-point, og de offentlige finanser forbliver holdbare.'
+		);
+	});
+	it('treats a change that rounds to zero as none', () => {
+		expect(financedCostLine(0.001)).toBe('Finansieret: pakken kræver ingen nævneværdig ændring af lukkeskatten.');
+	});
+	it('returns an empty string without a number', () => {
+		expect(financedCostLine(null)).toBe('');
 	});
 });

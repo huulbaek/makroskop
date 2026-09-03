@@ -4,6 +4,7 @@
 	import { formatSigned } from '$lib/format';
 	import { loadScenario, type Scenario, type ShockMeta } from '$lib/data';
 	import {
+		financedCostLine,
 		formatScale,
 		gdpPpToKr,
 		packageLine,
@@ -12,6 +13,7 @@
 		pctToLevel,
 		scaleSteps,
 		superpose,
+		unfinancedCostLine,
 		type PackageComponent
 	} from '$lib/package';
 	import {
@@ -164,28 +166,38 @@
 		return null;
 	}
 
+	/** One cell per headline year: the (scaled) deviation and its kr./persons equivalent. */
+	function cellsOf(key: string, values: (number | null)[], scale = 1) {
+		return headlineYears.map((year) => {
+			const v = values[yearIndex(year)];
+			const dev = v == null ? null : v * scale;
+			return { year, dev, level: levelOf(key, dev, year) };
+		});
+	}
+
 	const headline = $derived.by(() => {
 		if (!ready) return [];
-		return HEADLINE_INDICATORS.map((ind) => {
-			const values = deviation(ind.key);
-			return {
-				...ind,
-				cells: headlineYears.map((year) => {
-					const dev = values[yearIndex(year)] ?? null;
-					return { year, dev, level: levelOf(ind.key, dev, year) };
-				})
-			};
-		});
+		return HEADLINE_INDICATORS.map((ind) => ({ ...ind, cells: cellsOf(ind.key, deviation(ind.key)) }));
 	});
 
-	/** The closure tax reaction: how much the fiscal rule had to move to pay for the package. */
+	/** The closure tax reaction: how much the fiscal rule had to move to pay for the package.
+	 *  Only the financed closure has one. */
 	const lukkeskat = $derived.by(() => {
 		if (!ready || variant !== '_perm') return null;
-		const values = deviation('tLukning');
-		return headlineYears.map((year) => ({ year, dev: values[yearIndex(year)] ?? null }));
+		return cellsOf('tLukning', deviation('tLukning'));
 	});
 
-	const heroYear = $derived(headlineYears[1]);
+	/** Index of the year the hero tiles and the cost sentence quote (medium run). */
+	const HERO = 1;
+	const heroYear = $derived(headlineYears[HERO]);
+
+	/** "I 2035 koster pakken de offentlige finanser ca. 15,6 mia. kr. om året" — the number
+	 *  a costing sheet leads with. */
+	const costText = $derived.by(() => {
+		if (lukkeskat) return financedCostLine(lukkeskat[HERO]?.dev ?? null);
+		const saldo = headline.find((h) => h.key === 'saldo2bnp')?.cells[HERO];
+		return unfinancedCostLine(heroYear, saldo?.dev ?? null, saldo?.level ?? null);
+	});
 
 	// ------------------------------------------------------------------------------------
 	// Charts of the package total.
@@ -222,13 +234,11 @@
 			name: r.name,
 			label: r.shock?.labelDa ?? r.name,
 			scale: r.scale,
-			cells: headlineYears.map((year) => {
-				const v = r.scenario!.deviations[key]?.[yearIndex(year)];
-				return v == null ? null : v * r.scale;
-			})
+			cells: cellsOf(key, r.scenario!.deviations[key] ?? [], r.scale)
 		}));
-		const total = deviation(key);
-		return [...lines, { name: '__total', label: 'Pakken i alt', scale: null, cells: headlineYears.map((y) => total[yearIndex(y)] ?? null) }];
+		// The total row is the same row the Hovedtal table shows, so the two cannot drift.
+		const total = headline.find((h) => h.key === key)?.cells ?? cellsOf(key, deviation(key));
+		return [...lines, { name: '__total', label: 'Pakken i alt', scale: null, cells: total }];
 	});
 
 	/** True when any component was solved on a different MAKRO version than the baseline shown. */
@@ -473,7 +483,7 @@
 		{#if ready}
 			<div class="hero" aria-label={`Hovedtal i ${heroYear}`}>
 				{#each headline as ind (ind.key)}
-					{@const cell = ind.cells[1]}
+					{@const cell = ind.cells[HERO]}
 					<StatTile
 						label={`${ind.label} i ${heroYear}`}
 						value={fmtDev(cell.dev)}
@@ -486,6 +496,7 @@
 
 			<section class="card facts" aria-label="Hovedtal">
 				<h3>Hovedtal – afvigelse fra grundforløbet</h3>
+				{#if costText}<p class="cost">{costText}</p>{/if}
 				<div class="table-wrap">
 					<table>
 						<thead>
@@ -538,7 +549,7 @@
 					<table>
 						<thead>
 							<tr>
-								<th scope="col">{contributionIndicator.label}, {contributionIndicator.devUnit}</th>
+								<th scope="col" class="lead">{contributionIndicator.label}<span class="unit">{contributionIndicator.devUnit} · {contributionIndicator.levelUnit}</span></th>
 								{#each headlineYears as year (year)}<th scope="col">{year}</th>{/each}
 							</tr>
 						</thead>
@@ -546,8 +557,11 @@
 							{#each contributions as line (line.name)}
 								<tr class:total={line.scale == null}>
 									<th scope="row">{line.label}{#if line.scale != null}<span class="unit">×{formatScale(line.scale)}</span>{/if}</th>
-									{#each line.cells as v, i (i)}
-										<td><span class="dev">{fmtDev(v)}</span></td>
+									{#each line.cells as cell (cell.year)}
+										<td>
+											<span class="dev">{fmtDev(cell.dev)}</span>
+											<span class="level">{cell.level == null ? '' : fmtLevel(contributionIndicator.key, cell.level)}</span>
+										</td>
 									{/each}
 								</tr>
 							{/each}
@@ -986,6 +1000,18 @@
 		border-top: 2px solid var(--axis);
 		border-bottom: 0;
 		font-weight: 700;
+	}
+
+	.cost {
+		font-size: 15px;
+		line-height: 1.45;
+		color: var(--ink);
+		margin: 0 0 10px;
+		max-width: 70ch;
+	}
+
+	thead th.lead {
+		text-align: left;
 	}
 
 	.facts-note {

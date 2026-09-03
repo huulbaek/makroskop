@@ -2,6 +2,8 @@
  *  shocks with signed sizes, superposed linearly in the browser. Everything here is
  *  unit-tested; the page owns the loading and the rendering. */
 
+import { formatSigned, formatValue } from './format';
+
 export interface PackageComponent {
 	name: string;
 	scale: number;
@@ -109,4 +111,37 @@ export function packageLine(
 		return `${item.labelDa} ×${formatScale(item.scale)} (${item.changeDa}${mirrored})`;
 	});
 	return `Pakke: ${parts.join(' + ')} — ${closureLabel.toLowerCase()}`;
+}
+
+/** Rounded to the two decimals the tables show, so prose and cells agree and a −0,004
+ *  reads "0" rather than "-0". */
+function shown(value: number): number {
+	const rounded = Math.round(value * 100) / 100;
+	return rounded === 0 ? 0 : rounded;
+}
+
+function signedShown(value: number): string {
+	const rounded = shown(value);
+	return rounded === 0 ? '0' : formatSigned(rounded);
+}
+
+/** An unfinanced package's cost to the public finances in one plain sentence: the saldo
+ *  effect in the hero year, in kr. and pct.-point of GDP, rounded exactly as the table. */
+export function unfinancedCostLine(year: number, saldoPp: number | null, saldoKr: number | null): string {
+	if (saldoKr == null || saldoPp == null) return '';
+	const kr = shown(saldoKr);
+	if (kr === 0) return `I ${year} er pakken omtrent neutral for de offentlige finanser.`;
+	const verb = kr < 0 ? 'koster' : 'giver';
+	return `I ${year} ${verb} pakken de offentlige finanser ca. ${formatValue(Math.abs(kr))} mia. kr. om året (${signedShown(saldoPp)} pct.-point af BNP).`;
+}
+
+/** A financed package in one sentence: how far the closure tax had to move. The
+ *  tax-reaction closure pins long-run net worth, not the yearly saldo, so the sentence
+ *  must not claim the saldo is unchanged — the table under it shows what it does. */
+export function financedCostLine(lukkeskatPp: number | null): string {
+	if (lukkeskatPp == null) return '';
+	const pp = shown(lukkeskatPp);
+	if (pp === 0) return 'Finansieret: pakken kræver ingen nævneværdig ændring af lukkeskatten.';
+	if (pp > 0) return `Finansieret: lukkeskatten skal hæves ${formatValue(pp)} pct.-point, for at de offentlige finanser forbliver holdbare på langt sigt.`;
+	return `Finansieret: pakken giver råderum – lukkeskatten kan sænkes ${formatValue(-pp)} pct.-point, og de offentlige finanser forbliver holdbare.`;
 }
