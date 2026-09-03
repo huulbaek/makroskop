@@ -280,6 +280,15 @@
 	let copied = $state(false);
 	let exporting: string | null = $state(null);
 
+	/** The package state in one sentence, for a polite live region: adding or removing a
+	 *  shock changes tables and charts that a screen reader would otherwise not notice. */
+	const statusText = $derived.by(() => {
+		if (loading > 0) return 'Henter stødene …';
+		if (components.length === 0) return 'Pakken er tom.';
+		if (!ready) return 'Ingen af pakkens stød er løst med den valgte finansiering.';
+		return `Pakken: ${active.length} af ${components.length} stød indgår i summen, ${closureLabel.toLowerCase()}.`;
+	});
+
 	async function copyLink() {
 		await navigator.clipboard.writeText(shareUrl);
 		copied = true;
@@ -373,30 +382,47 @@
 	<aside aria-label="Stødkatalog">
 		<p class="aside-hint">Klik for at lægge et stød i pakken.</p>
 		{#each [...shockGroups] as [group, shocks] (group)}
-			<h3>{group}</h3>
+			<h2>{group}</h2>
 			{#each shocks as shock (shock.name)}
 				{@const inPackage = components.some((c) => c.name === shock.name)}
 				{@const usable = shock.available.includes(variant)}
+				{@const reason = usable
+					? ''
+					: shock.available.length > 0
+						? `Kun løst ${meta.variations.find((v) => v.suffix === shock.available[0])?.labelDa?.toLowerCase()}`
+						: 'Afventer modelkørsel'}
+				{@const blocked = !usable && !inPackage}
+				<!-- aria-disabled rather than disabled: the button stays focusable, so the reason is read out. -->
 				<button
 					class="shock"
 					class:selected={inPackage}
-					disabled={!usable && !inPackage}
-					title={usable ? '' : shock.available.length > 0 ? `Kun løst ${meta.variations.find((v) => v.suffix === shock.available[0])?.labelDa?.toLowerCase()}` : 'Afventer modelkørsel'}
+					aria-disabled={blocked}
+					title={reason || undefined}
 					aria-pressed={inPackage}
-					onclick={() => toggle(shock.name)}
+					onclick={() => {
+						if (!blocked) toggle(shock.name);
+					}}
 				>
-					{shock.labelDa}
+					{shock.labelDa}{#if reason}<span class="sr-only"> – {reason.toLowerCase()}</span>{/if}
 				</button>
 			{/each}
 		{/each}
 	</aside>
 
 	<div class="detail">
+		<div class="sr-only" role="status">{statusText}</div>
+		<div class="sr-only" role="status">{copied ? 'Link kopieret til udklipsholderen.' : ''}</div>
+		<div class="sr-only" role="status">{exporting ? 'Laver PNG …' : ''}</div>
 		<div class="detail-head">
 			<h2>Pakkens indhold</h2>
 			<div class="chip-row" role="group" aria-label="Finansiering">
 				{#each CLOSURES as suffix (suffix)}
-					<button class="chip" class:active={variant === suffix} onclick={() => setVariant(suffix)}>
+					<button
+						class="chip"
+						class:active={variant === suffix}
+						aria-pressed={variant === suffix}
+						onclick={() => setVariant(suffix)}
+					>
 						{meta.variations.find((v) => v.suffix === suffix)?.labelDa ?? suffix}
 					</button>
 				{/each}
@@ -495,7 +521,9 @@
 			<section class="facts" aria-label="Hovedtal">
 				<h3>Hovedtal – afvigelse fra grundforløbet</h3>
 				{#if costText}<p class="cost">{costText}</p>{/if}
-				<div class="table-wrap">
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+				<!-- Focusable on purpose: the table scrolls sideways on narrow screens, and a keyboard needs a focus stop to do that. -->
+				<div class="table-wrap" tabindex="0" role="region" aria-label="Hovedtal, tabel">
 					<table>
 						<thead>
 							<tr>
@@ -539,11 +567,17 @@
 					<h3>Hvad bidrager med hvad?</h3>
 					<div class="chip-row" role="group" aria-label="Indikator">
 						{#each HEADLINE_INDICATORS as ind (ind.key)}
-							<button class="chip" class:active={indicator === ind.key} onclick={() => (indicator = ind.key)}>{ind.label}</button>
+							<button
+								class="chip"
+								class:active={indicator === ind.key}
+								aria-pressed={indicator === ind.key}
+								onclick={() => (indicator = ind.key)}>{ind.label}</button
+							>
 						{/each}
 					</div>
 				</div>
-				<div class="table-wrap">
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+				<div class="table-wrap" tabindex="0" role="region" aria-label="Bidrag fra de enkelte stød, tabel">
 					<table>
 						<thead>
 							<tr>
@@ -772,7 +806,7 @@
 		font-size: 10px;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
-		color: var(--series-2);
+		color: var(--warm-text);
 	}
 
 	.scale-readout .approx.blank {

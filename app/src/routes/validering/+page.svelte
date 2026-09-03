@@ -19,12 +19,14 @@
 	const daOne = new Intl.NumberFormat('da-DK', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 	const daTwo = new Intl.NumberFormat('da-DK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-	/** "1,1 × 10⁻¹⁵"-style scientific notation as HTML. */
+	/** "1,1 × 10⁻¹⁵"-style scientific notation as HTML. The superscript is for the eye;
+	 *  assistive tech gets a spoken form ("1,1 gange 10 i minus 15") instead. */
 	function sci(value: number): string {
 		if (value === 0) return '0';
 		const exponent = Math.floor(Math.log10(Math.abs(value)));
 		const mantissa = (value / Math.pow(10, exponent)).toFixed(1).replace('.', ',');
-		return `${mantissa} × 10<sup>${exponent}</sup>`;
+		const spoken = `${mantissa} gange 10 i ${exponent < 0 ? 'minus ' : ''}${Math.abs(exponent)}`;
+		return `<span aria-hidden="true">${mantissa} × 10<sup>${exponent}</sup></span><span class="sr-only">${spoken}</span>`;
 	}
 
 	/** Deviation of one series in a given year (null when the scenario is not ingested). */
@@ -180,27 +182,27 @@
 				<caption>Genfinder modellens egen løsning efter tilfældig forstyrrelse</caption>
 				<tbody>
 					<tr>
-						<th>Forstyrrelse af alle variable</th>
+						<th scope="row">Forstyrrelse af alle variable</th>
 						<td>±{daTwo.format(full.perturbation * 100)} pct. relativt</td>
 					</tr>
 					<tr>
-						<th>Slutresidual, ‖fejl‖<sub>∞</sub></th>
+						<th scope="row">Slutresidual, ‖fejl‖<sub>∞</sub></th>
 						<td>{@html sci(full.finalResidual)}</td>
 					</tr>
 					<tr>
-						<th>Median-afvigelse fra CONOPTs original</th>
+						<th scope="row">Median-afvigelse fra CONOPTs original</th>
 						<td>{@html sci(full.medianRecovery)}</td>
 					</tr>
 					<tr>
-						<th>Størst afvigelse (enkelte NPV-variable)</th>
+						<th scope="row">Størst afvigelse (enkelte NPV-variable)</th>
 						<td>{@html sci(full.maxRelDev)}</td>
 					</tr>
 					<tr>
-						<th>Én faktorisering, UMFPACK</th>
+						<th scope="row">Én faktorisering, UMFPACK</th>
 						<td>{daInt.format(Math.round(full.factorSecondsUmfpack))} s</td>
 					</tr>
 					<tr>
-						<th>Newton-iterationer</th>
+						<th scope="row">Newton-iterationer</th>
 						<td>{full.iterations.length - 1}</td>
 					</tr>
 				</tbody>
@@ -219,7 +221,7 @@
 				{full.iterations.length - 1} iterationer — samme kvadratiske signatur som i det lille udsnit.
 			</p>
 			<table class="results mono-table">
-				<thead><tr><th>Iteration</th><th>‖fejl‖<sub>∞</sub></th></tr></thead>
+				<thead><tr><th scope="col">Iteration</th><th scope="col">‖fejl‖<sub>∞</sub></th></tr></thead>
 				<tbody>
 					{#each full.iterations as residual, i (i)}
 						<tr>
@@ -270,19 +272,19 @@
 				<caption>Sådan blev det løst</caption>
 				<tbody>
 					<tr>
-						<th>Ligninger i løsningsvinduet</th>
+						<th scope="row">Ligninger i løsningsvinduet</th>
 						<td>{daInt.format(solve.windowEquations)} ({solve.windowYears})</td>
 					</tr>
 					<tr>
-						<th>Kontinuationstrin</th>
+						<th scope="row">Kontinuationstrin</th>
 						<td>{solve.stagesConverged} konvergerede · {solve.stagesRejected} afvist og halveret</td>
 					</tr>
 					<tr>
-						<th>Faktoriseringer (UMFPACK)</th>
+						<th scope="row">Faktoriseringer (UMFPACK)</th>
 						<td>{solve.freshFactorizations} · {daOne.format(solve.factorHours)} timer</td>
 					</tr>
 					<tr>
-						<th>Slutresidual, ‖fejl‖<sub>∞</sub></th>
+						<th scope="row">Slutresidual, ‖fejl‖<sub>∞</sub></th>
 						<td>{@html sci(solve.finalResidual)}</td>
 					</tr>
 				</tbody>
@@ -290,7 +292,7 @@
 			<div class="trace">
 				<h3>{solve.lastStageLabelDa}</h3>
 				<table class="results mono-table">
-					<thead><tr><th>Iteration</th><th>‖fejl‖<sub>∞</sub></th></tr></thead>
+					<thead><tr><th scope="col">Iteration</th><th scope="col">‖fejl‖<sub>∞</sub></th></tr></thead>
 					<tbody>
 						{#each solve.lastStageIterations as residual, i (i)}
 							<tr>
@@ -315,12 +317,14 @@
 	<p class="story">
 		DREAM har offentliggjort finanspolitiske multiplikatorer for MAKRO i
 		<a href={multipliers.reference.url} target="_blank" rel="noopener noreferrer"
-			>Finanspolitiske multiplikatorer i MAKRO</a
+			>Finanspolitiske multiplikatorer i MAKRO<span class="sr-only"> (åbner i nyt vindue)</span></a
 		> (december 2021). {multipliers.definitionDa} Begge sæt tal gælder permanente, ufinansierede
 		stød; MAKROskops stødår er {multipliers.shockYear}, mens DREAMs reference er
 		{multipliers.reference.modelDa}.
 	</p>
-	<div class="table-scroll">
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<!-- Focusable on purpose: the table scrolls sideways on narrow screens. -->
+	<div class="table-scroll" tabindex="0" role="region" aria-label="Multiplikatorer, tabel">
 		<table class="results multiplier-table">
 			<thead>
 				<tr>
@@ -373,7 +377,7 @@
 	<p class="footnote">
 		Kilde:
 		<a href={multipliers.reference.url} target="_blank" rel="noopener noreferrer"
-			>{multipliers.reference.source}</a
+			>{multipliers.reference.source}<span class="sr-only"> (åbner i nyt vindue)</span></a
 		>.
 	</p>
 </section>
@@ -387,27 +391,27 @@
 				<caption>Uenighed mellem løserne, {daInt.format(validation.system.windowEquations)} variable</caption>
 				<tbody>
 					<tr>
-						<th>Median (relativt)</th>
+						<th scope="row">Median (relativt)</th>
 						<td>{@html sci(flagship.medianRel)}</td>
 					</tr>
 					<tr>
-						<th>99,9-percentil</th>
+						<th scope="row">99,9-percentil</th>
 						<td>{@html sci(flagship.p999Rel)}</td>
 					</tr>
 					<tr>
-						<th>Størst (IPOPTs egen tolerance)</th>
+						<th scope="row">Størst (IPOPTs egen tolerance)</th>
 						<td>{@html sci(flagship.maxRel)}</td>
 					</tr>
 					<tr>
-						<th>Stød-effekter, median-afvigelse</th>
+						<th scope="row">Stød-effekter, median-afvigelse</th>
 						<td>{@html sci(flagship.irfMedian ?? 0)} af effekten</td>
 					</tr>
 					<tr>
-						<th>GAMS/IPOPT</th>
+						<th scope="row">GAMS/IPOPT</th>
 						<td>{flagship.gams.seconds}s · {flagship.gams.status}</td>
 					</tr>
 					<tr>
-						<th>Fri løser, slutresidual</th>
+						<th scope="row">Fri løser, slutresidual</th>
 						<td>{@html sci(flagship.free.finalResidual)}</td>
 					</tr>
 				</tbody>
@@ -421,7 +425,7 @@
 						kvadratisk mod nul. Det er signaturen på en korrekt løsning, ikke en tilnærmelse.
 					</p>
 					<table class="results mono-table">
-						<thead><tr><th>Iteration</th><th>‖fejl‖<sub>∞</sub></th></tr></thead>
+						<thead><tr><th scope="col">Iteration</th><th scope="col">‖fejl‖<sub>∞</sub></th></tr></thead>
 						<tbody>
 							{#each flagship.trace.iterations as residual, i (i)}
 								<tr>
@@ -445,15 +449,15 @@
 			<table class="results">
 				<tbody>
 					<tr>
-						<th>Median-uenighed</th>
+						<th scope="row">Median-uenighed</th>
 						<td>{@html sci(oracle.medianRel)}</td>
 					</tr>
 					<tr>
-						<th>99,9-percentil</th>
+						<th scope="row">99,9-percentil</th>
 						<td>{@html sci(oracle.p999Rel)}</td>
 					</tr>
 					<tr>
-						<th>Fri løser</th>
+						<th scope="row">Fri løser</th>
 						<td>{oracle.free.note}</td>
 					</tr>
 				</tbody>
@@ -469,7 +473,7 @@
 			bærbar; Newton skal finde tilbage.
 		</p>
 		<table class="results mono-table">
-			<thead><tr><th>Iteration</th><th>‖fejl‖<sub>∞</sub></th></tr></thead>
+			<thead><tr><th scope="col">Iteration</th><th scope="col">‖fejl‖<sub>∞</sub></th></tr></thead>
 			<tbody>
 				{#each validation.recovery.iterations as residual, i (i)}
 					<tr>

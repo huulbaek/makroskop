@@ -41,6 +41,11 @@
 
 	let width = $state(640);
 	let hoverYear: number | null = $state(null);
+	/** Keyboard readout, spoken through a polite live region (pointer hover stays silent). */
+	let announce = $state('');
+	/** The table is rendered only once opened: a century of rows per chart adds up on a sheet. */
+	let tableOpen = $state(false);
+	const uid = $props.id();
 
 	const margin = { top: 14, right: 18, bottom: 26, left: 52 };
 
@@ -157,6 +162,7 @@
 		event.preventDefault();
 		if (event.key === 'Escape') {
 			hoverYear = null;
+			announce = '';
 			return;
 		}
 		const yearsVisible = visible.map((i) => years[i]);
@@ -165,6 +171,17 @@
 		const pos = yearsVisible.indexOf(current);
 		const next = event.key === 'ArrowRight' ? Math.min(yearsVisible.length - 1, pos + 1) : Math.max(0, pos - 1);
 		hoverYear = yearsVisible[next];
+		announce = readout(hoverYear);
+	}
+
+	/** "2030 (fremskrivning): BNP, realt +0,4 pct." — the tooltip in words. */
+	function readout(year: number): string {
+		const index = years.indexOf(year);
+		const parts = series
+			.filter((s) => s.values[index] != null)
+			.map((s) => `${s.label} ${fmt(s.values[index] as number)}`);
+		const projection = lastDataYear && year > lastDataYear ? ' (fremskrivning)' : '';
+		return `${year}${projection}: ${parts.join(', ')}`;
 	}
 
 	const hoverIndex = $derived(hoverYear == null ? -1 : years.indexOf(hoverYear));
@@ -181,8 +198,6 @@
 		const x = xPos(hoverYear);
 		return Math.min(Math.max(x - 80, 4), Math.max(4, width - 170));
 	});
-
-	const tableStride = $derived(Math.max(1, Math.ceil(visible.length / 25)));
 
 	function fmt(v: number): string {
 		return (zeroLine ? formatSigned(v) : formatValue(v)) + suffix;
@@ -208,17 +223,25 @@
 	{/if}
 
 	{#if visible.length === 0}
-		<div class="empty" style:height="{height}px">Ingen data i det valgte interval.</div>
+		<div class="empty" role="status" style:height="{height}px">Ingen data i det valgte interval.</div>
 	{:else}
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-		<!-- Focusable on purpose: arrow keys move the readout; values are also in the table view below. -->
+		<!-- Focusable on purpose: arrow keys move the readout, which is spoken through the live
+		     region below; the same numbers are in the table view. A group, not an application:
+		     an application role would trap a screen reader's virtual cursor in a silent widget. -->
 		<div
 			class="plot"
-			role="application"
-			aria-label="{title}. Linjediagram {fromYear} til {toYear}. Brug piletaster for at aflæse værdier."
+			role="group"
+			aria-label="{title}. Linjediagram {fromYear} til {toYear}."
+			aria-describedby="{uid}-hint"
 			tabindex="0"
 			onkeydown={onKeydown}
 		>
+			<p id="{uid}-hint" class="sr-only">
+				Brug venstre og højre piletast for at aflæse værdier år for år. Tallene findes også i tabellen
+				under grafen.
+			</p>
+			<div class="sr-only" aria-live="polite">{announce}</div>
 			<svg bind:this={svg} {width} {height} aria-hidden="true">
 				<!-- projection region -->
 				{#if nuVisible}
@@ -305,7 +328,7 @@
 			</svg>
 
 			{#if hoverYear != null && tooltipRows.length > 0}
-				<div class="tooltip" style:left="{tooltipLeft}px">
+				<div class="tooltip" style:left="{tooltipLeft}px" aria-hidden="true">
 					<div class="tooltip-year">{hoverYear}{#if lastDataYear && hoverYear > lastDataYear}<span class="proj">fremskrivning</span>{/if}</div>
 					{#each tooltipRows as row (row.label)}
 						<div class="tooltip-row">
@@ -318,24 +341,27 @@
 			{/if}
 		</div>
 
-		<details class="table-view">
+		<details class="table-view" ontoggle={(e) => (tableOpen = e.currentTarget.open)}>
 			<summary>Vis som tabel</summary>
 			<table>
+				<caption class="sr-only">{title}{unit ? `, ${unit}` : ''}. Alle år {fromYear} til {toYear}.</caption>
 				<thead>
 					<tr>
-						<th>År</th>
-						{#each series as s (s.key)}<th>{s.label}</th>{/each}
+						<th scope="col">År</th>
+						{#each series as s (s.key)}<th scope="col">{s.label}</th>{/each}
 					</tr>
 				</thead>
 				<tbody>
-					{#each visible.filter((_, n) => n % tableStride === 0) as i (i)}
-						<tr>
-							<td>{years[i]}</td>
-							{#each series as s (s.key)}
-								<td>{s.values[i] == null ? '–' : fmt(s.values[i] as number)}</td>
-							{/each}
-						</tr>
-					{/each}
+					{#if tableOpen}
+						{#each visible as i (i)}
+							<tr>
+								<th scope="row">{years[i]}</th>
+								{#each series as s (s.key)}
+									<td>{s.values[i] == null ? '–' : fmt(s.values[i] as number)}</td>
+								{/each}
+							</tr>
+						{/each}
+					{/if}
 				</tbody>
 			</table>
 		</details>
@@ -524,5 +550,10 @@
 	.table-view th {
 		color: var(--ink-secondary);
 		font-weight: 500;
+	}
+
+	.table-view tbody th {
+		color: var(--ink);
+		font-weight: 400;
 	}
 </style>

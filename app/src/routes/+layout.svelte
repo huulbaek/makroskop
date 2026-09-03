@@ -15,6 +15,15 @@
 		if (href === '/') return page.url.pathname === '/';
 		return page.url.pathname.startsWith(href.replace(/\/$/, ''));
 	}
+
+	let main: HTMLElement | undefined = $state();
+
+	/** Skip link: move focus into <main> without touching the URL (the pages keep their own query). */
+	function skipToContent(event: MouseEvent) {
+		event.preventDefault();
+		main?.focus();
+		main?.scrollIntoView({ block: 'start' });
+	}
 </script>
 
 <svelte:head>
@@ -35,6 +44,8 @@
 	<meta name="theme-color" content="#14AFA6" />
 </svelte:head>
 
+<a class="skip-link" href="#indhold" onclick={skipToContent}>Spring til indhold</a>
+
 <div class="shell">
 	<header>
 		<a class="wordmark" href="/">MAKRO<span>skop</span></a>
@@ -47,7 +58,7 @@
 		</nav>
 	</header>
 
-	<main>
+	<main id="indhold" tabindex="-1" bind:this={main}>
 		{@render children()}
 	</main>
 
@@ -104,8 +115,30 @@
 		font-style: italic;
 	}
 
+	.wordmark,
 	.wordmark:hover {
 		text-decoration: none;
+	}
+
+	/* Off-screen until it receives focus; then a small tab at the top-left of the page. */
+	.skip-link {
+		position: absolute;
+		top: 8px;
+		left: 8px;
+		z-index: 10;
+		padding: 8px 14px;
+		background: var(--ink);
+		color: var(--page);
+		font-size: 14px;
+		font-weight: 500;
+		text-decoration: none;
+		border-radius: var(--radius);
+		transform: translateY(-200%);
+	}
+
+	.skip-link:focus-visible {
+		transform: none;
+		outline-color: var(--makro);
 	}
 
 	nav {
@@ -121,11 +154,11 @@
 		color: var(--ink-secondary);
 		border-bottom: 2px solid transparent;
 		margin-bottom: -1px;
+		text-decoration: none;
 		transition: color 0.12s;
 	}
 
 	nav a:hover {
-		text-decoration: none;
 		color: var(--ink);
 	}
 
@@ -137,6 +170,11 @@
 	main {
 		flex: 1;
 		padding: 40px 0 0;
+	}
+
+	/* The skip link lands here; <main> is a landmark, not a control, so no ring around the page. */
+	main:focus {
+		outline: none;
 	}
 
 	footer {

@@ -184,6 +184,15 @@
 	let copied = $state(false);
 	let exporting: string | null = $state(null);
 
+	/** What the page is showing, for a polite live region: the visual cues (dimmed grid,
+	 *  swapped heading) say nothing to a screen reader. */
+	const statusText = $derived.by(() => {
+		if (loading) return 'Henter scenariet …';
+		if (!scenario) return `${selectedShock.labelDa}: endnu ikke beregnet.`;
+		if (selectedName === '_demo') return 'Viser det syntetiske demo-scenarie.';
+		return `Viser ${selectedShock.labelDa}, ${closureLabel.toLowerCase()}.`;
+	});
+
 	async function copyLink() {
 		await navigator.clipboard.writeText(shareUrl);
 		copied = true;
@@ -249,28 +258,34 @@
 		<button
 			class="shock demo-entry"
 			class:selected={selectedName === '_demo'}
+			aria-pressed={selectedName === '_demo'}
 			onclick={() => select('_demo', '')}
 		>
 			Syntetisk demo-scenarie
 		</button>
 
 		{#each [...shockGroups] as [group, shocks] (group)}
-			<h3>{group}</h3>
+			<h2>{group}</h2>
 			{#each shocks as shock (shock.name)}
+				{@const pending = shock.available.length === 0}
 				<button
 					class="shock"
 					class:selected={selectedName === shock.name}
-					class:pending={shock.available.length === 0}
-					title={shock.available.length > 0 ? '' : 'Afventer modelkørsel'}
+					class:pending={pending}
+					aria-pressed={selectedName === shock.name}
+					title={pending ? 'Afventer modelkørsel' : undefined}
 					onclick={() => select(shock.name, shock.available[0] ?? meta.variations[1]?.suffix ?? '_midl')}
 				>
-					{shock.labelDa}
+					{shock.labelDa}{#if pending}<span class="sr-only"> – afventer modelkørsel</span>{/if}
 				</button>
 			{/each}
 		{/each}
 	</aside>
 
 	<div class="detail">
+		<div class="sr-only" role="status">{statusText}</div>
+		<div class="sr-only" role="status">{copied ? 'Link kopieret til udklipsholderen.' : ''}</div>
+		<div class="sr-only" role="status">{exporting ? 'Laver PNG …' : ''}</div>
 		<div class="detail-head">
 			<h2>{selectedShock.labelDa}</h2>
 			{#if selectedName !== '_demo'}
@@ -279,6 +294,7 @@
 						<button
 							class="chip"
 							class:active={selectedVariation === variation.suffix}
+							aria-pressed={selectedVariation === variation.suffix}
 							disabled={!selectedShock.available.includes(variation.suffix)}
 							onclick={() => select(selectedName, variation.suffix)}
 						>
@@ -591,7 +607,7 @@
 		font-size: 10px;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
-		color: var(--series-2);
+		color: var(--warm-text);
 	}
 
 	.scale-readout .approx.blank {

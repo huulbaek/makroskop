@@ -6,7 +6,7 @@
 	/* identity: MAKRO's own brand teal (from the model repo). UI-only — never a data
 	   series color — and used sparingly: links, the active nav rule, selected rows. */
 	--makro: #0f9a92;
-	--makro-strong: #0b7d76;
+	--makro-strong: #0a736d; /* 4.9:1 on --makro-wash, 5.5:1 on the page */
 	--makro-wash: rgba(15, 154, 146, 0.1);
 
 	/* planes: the page is the paper; only real panels (definitions, notices) get a surface */
@@ -17,19 +17,21 @@
 	/* ink */
 	--ink: #171d1c;
 	--ink-secondary: #4e5957;
-	--ink-muted: #7d8886;
+	--ink-muted: #67746f; /* 4.7:1 on the page — the lightest ink allowed for text */
 
 	/* rules and chart chrome */
 	--rule: rgba(23, 29, 28, 0.16);
 	--rule-strong: rgba(23, 29, 28, 0.55);
 	--border: var(--rule);
 	--grid: #e4e6e2;
-	--axis: #b9bfbb;
+	--axis: #848e8a; /* zero line and now-divider: 3:1 against the page */
 
 	/* data series (validated dataviz reference palette) */
 	--series-1: #2a78d6;
 	--series-2: #eb6834;
 	--series-wash: rgba(42, 120, 214, 0.1);
+	/* the orange as *text* (badges, slider readout): the series colour itself is only 3.1:1 */
+	--warm-text: #bb4d1c;
 
 	/* semantics */
 	--good: #0d6b1f;
@@ -62,11 +64,12 @@
 		--rule: rgba(236, 238, 237, 0.14);
 		--rule-strong: rgba(236, 238, 237, 0.5);
 		--grid: #262c2b;
-		--axis: #414947;
+		--axis: #6b7573;
 
 		--series-1: #4b8fe6;
 		--series-2: #e5703f;
 		--series-wash: rgba(75, 143, 230, 0.14);
+		--warm-text: #e5703f;
 
 		--good: #3fb85a;
 		--bad: #ea6b5d;
@@ -117,14 +120,18 @@ h3 {
 	line-height: 1.2;
 }
 
+/* Links are underlined by default: colour alone does not separate them from the text
+   around them (WCAG 1.4.1). Controls styled as links (nav, chips, wordmark) opt out. */
 a {
 	color: var(--makro-strong);
-	text-decoration: none;
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 3px;
+	text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
 }
 
 a:hover {
-	text-decoration: underline;
-	text-underline-offset: 3px;
+	text-decoration-color: currentColor;
 }
 
 code,
@@ -195,6 +202,7 @@ em {
 	background: transparent;
 	color: var(--ink-secondary);
 	cursor: pointer;
+	text-decoration: none;
 	transition:
 		color 0.12s,
 		border-color 0.12s,
@@ -237,7 +245,7 @@ em {
 	padding-right: 20px;
 }
 
-.workbench aside h3 {
+.workbench aside h2 {
 	font-family: var(--font-body);
 	font-size: 11px;
 	font-weight: 600;
@@ -247,7 +255,7 @@ em {
 	margin: 18px 0 4px;
 }
 
-.workbench aside h3:first-of-type {
+.workbench aside h2:first-of-type {
 	margin-top: 0;
 }
 
@@ -267,7 +275,7 @@ em {
 	cursor: pointer;
 }
 
-.shock:hover:not(:disabled) {
+.shock:hover:not(:disabled):not([aria-disabled='true']) {
 	color: var(--ink);
 }
 
@@ -278,6 +286,7 @@ em {
 }
 
 .shock:disabled,
+.shock[aria-disabled='true'],
 .shock.pending {
 	color: var(--ink-muted);
 	cursor: not-allowed;
@@ -393,7 +402,7 @@ em {
 }
 
 .badge.warm {
-	color: var(--series-2);
+	color: var(--warm-text);
 }
 
 /* closing "how to read this" note under a page */
@@ -421,6 +430,19 @@ em {
 
 .muted {
 	color: var(--ink-muted);
+}
+
+/* Visually hidden, still read by assistive tech (status messages, table captions, hints). */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

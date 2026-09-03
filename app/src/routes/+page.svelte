@@ -57,6 +57,10 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Grundforløb · MAKROskop</title>
+</svelte:head>
+
 <section class="opener">
 	<h1>Dansk økonomi, beregnet et århundrede frem</h1>
 	<p class="lede">
@@ -107,7 +111,12 @@
 	<div class="filters" role="group" aria-label="Filtre">
 		<div class="chip-row" role="group" aria-label="Emne">
 			{#each groups as group (group)}
-				<button class="chip" class:active={activeGroup === group} onclick={() => (activeGroup = group)}>
+				<button
+					class="chip"
+					class:active={activeGroup === group}
+					aria-pressed={activeGroup === group}
+					onclick={() => (activeGroup = group)}
+				>
 					{group}
 				</button>
 			{/each}
@@ -117,6 +126,7 @@
 				<button
 					class="chip"
 					class:active={range.from === preset.from && range.to === preset.to}
+					aria-pressed={range.from === preset.from && range.to === preset.to}
 					onclick={() => (range = { from: preset.from, to: preset.to })}
 				>
 					{preset.label}
