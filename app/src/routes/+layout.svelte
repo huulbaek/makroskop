@@ -91,7 +91,6 @@
 		justify-content: space-between;
 		gap: 24px;
 		height: 64px;
-		border-top: 3px solid var(--ink);
 		border-bottom: 1px solid var(--rule);
 	}
 

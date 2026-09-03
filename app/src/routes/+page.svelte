@@ -48,29 +48,11 @@
 </script>
 
 <section class="opener">
-	<div class="opener-text">
-		<h1>Dansk økonomi, beregnet et århundrede frem</h1>
-		<p class="lede">
-			MAKRO er modellen bag Finansministeriets regnestykker. Her ses dens stiliserede grundforløb:
-			historiske data frem til {t}, modelfremskrivning derefter – helt til {meta.yearEnd}.
-		</p>
-		<p class="model-note">{meta.model.name}</p>
-	</div>
-
-	<div class="opener-chart">
-		<LineChart
-			title="Bruttonationalprodukt, realt"
-			code="qBNP"
-			unit="mia. 2020-kr."
-			years={baseline.years}
-			series={chartSeries('qBNP', 'BNP, realt')}
-			fromYear={1985}
-			toYear={2100}
-			lastDataYear={t}
-			nowLabel
-			height={300}
-		/>
-	</div>
+	<h1>Dansk økonomi, beregnet et århundrede frem</h1>
+	<p class="lede">
+		MAKRO er modellen bag Finansministeriets regnestykker. Her ses dens stiliserede grundforløb:
+		historiske data frem til {t}, modelfremskrivning derefter – helt til {meta.yearEnd}.
+	</p>
 </section>
 
 <section class="figures" aria-label="Nøgletal">
@@ -93,6 +75,21 @@
 		unit="pct. af BNP"
 		tone={hbi != null && hbi >= 0 ? 'good' : 'bad'}
 		note="Finanspolitikken er {hbi != null && hbi >= 0 ? 'overholdbar' : 'uholdbar'} i grundforløbet"
+	/>
+</section>
+
+<section class="century" aria-label="BNP over hele forløbet">
+	<LineChart
+		title="Bruttonationalprodukt, realt"
+		code="qBNP"
+		unit="mia. 2020-kr."
+		years={baseline.years}
+		series={chartSeries('qBNP', 'BNP, realt')}
+		fromYear={1985}
+		toYear={2100}
+		lastDataYear={t}
+		nowLabel
+		height={320}
 	/>
 </section>
 
@@ -149,26 +146,8 @@
 </section>
 
 <style>
-	.opener {
-		display: grid;
-		grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-		gap: 48px;
-		align-items: end;
-	}
-
 	.opener h1 {
-		max-width: 16ch;
-	}
-
-	.model-note {
-		font-family: var(--font-mono);
-		font-size: 11.5px;
-		color: var(--ink-muted);
-		margin: 18px 0 0;
-	}
-
-	.opener-chart {
-		min-width: 0;
+		max-width: 18ch;
 	}
 
 	.figures {
@@ -177,12 +156,16 @@
 		margin-top: 36px;
 		padding: 18px 0;
 		border-top: 1px solid var(--rule-strong);
-		border-bottom: 1px solid var(--rule);
 	}
 
 	.figures > :global(.figure:first-child) {
 		border-left: 0;
 		padding-left: 0;
+	}
+
+	.century {
+		border-top: 1px solid var(--rule-strong);
+		padding: 14px 0 18px;
 	}
 
 	.browser {
@@ -198,10 +181,6 @@
 	}
 
 	@media (max-width: 900px) {
-		.opener {
-			grid-template-columns: 1fr;
-			gap: 28px;
-		}
 		.figures {
 			grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 			row-gap: 18px;
