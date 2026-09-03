@@ -117,8 +117,8 @@
 		efterprøvet den på to måder: ved at løse <em>præcis de samme stød-scenarier</em> med den
 		officielle GAMS-platform (solveren IPOPT) og med vores egen frie Newton-løser — og ved at
 		lade den frie løser genfinde modellens egen løsning for <em>alle
-		{daInt.format(full.equations)} ligninger</em> over hele horisonten. Begge prøver bestås til
-		maskinpræcision.
+		{daInt.format(full.equations)} ligninger</em> over hele horisonten. Begge prøver bestås:
+		forskellene ligger på computerens afrundingsniveau, det man kalder maskinpræcision.
 	</p>
 </section>
 
@@ -305,7 +305,7 @@
 				<p class="trace-note">
 					Iteration 1–2 lader fejlen eksplodere: det er langsigtede nutidsværdi-variable, der
 					lægger sig til rette efter et fuldt Newton-skridt. Løseren accepterer det bevidst
-					(ikke-monoton linjesøgning) og lander derefter på maskinpræcision.
+					(ikke-monoton linjesøgning) og lander derefter på afrundingsniveau.
 				</p>
 			</div>
 		</div>

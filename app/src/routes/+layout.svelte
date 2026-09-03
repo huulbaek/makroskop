@@ -4,17 +4,49 @@
 
 	let { children, data } = $props();
 
+	/** Nav entries double as the per-page <meta name="description">, so each page gets
+	 *  one description and the layout never emits a duplicate tag. */
 	const links = [
-		{ href: '/', label: 'Grundforløb' },
-		{ href: '/scenarier/', label: 'Scenarier' },
-		{ href: '/pakke/', label: 'Pakker' },
-		{ href: '/validering/', label: 'Validering' }
+		{
+			href: '/',
+			label: 'Grundforløb',
+			description:
+				'MAKROs grundforløb for dansk økonomi: BNP, beskæftigelse, priser, offentlige finanser og renter – historiske data og modelfremskrivning frem til 2100.'
+		},
+		{
+			href: '/scenarier/',
+			label: 'Scenarier',
+			description:
+				'Hvad sker der i MAKRO, hvis bundskatten ændres, det offentlige forbrug stiger eller renten hæves? Modellens standardstød vist som afvigelser fra grundforløbet.'
+		},
+		{
+			href: '/pakke/',
+			label: 'Pakker',
+			description:
+				'Sæt flere standardstød sammen til én politikpakke og se, hvad MAKRO siger om BNP, beskæftigelse og de offentlige finanser – med prisen i kroner.'
+		},
+		{
+			href: '/validering/',
+			label: 'Validering',
+			description:
+				'Kan man stole på tallene? MAKROskops frie løser er efterprøvet mod GAMS/IPOPT på de samme stød og ved at genfinde løsningen for alle modellens ligninger.'
+		}
 	];
+
+	/** Public origin, for tags that must be absolute (og:image). */
+	const SITE_URL = 'https://makroskop.nodalit.com';
+
+	const SITE_DESCRIPTION =
+		'MAKROskop er en fri, licensløs udgave af MAKRO – den makroøkonomiske model bag Finansministeriets regnestykker: grundforløb, stød-scenarier og politikpakker.';
 
 	function isActive(href: string): boolean {
 		if (href === '/') return page.url.pathname === '/';
 		return page.url.pathname.startsWith(href.replace(/\/$/, ''));
 	}
+
+	const current = $derived(links.find((link) => isActive(link.href)));
+	const description = $derived(current?.description ?? SITE_DESCRIPTION);
+	const ogTitle = $derived(current ? `${current.label} · MAKROskop` : 'MAKROskop – udforsk MAKRO uden licens');
 
 	let main: HTMLElement | undefined = $state();
 
@@ -28,19 +60,20 @@
 
 <svelte:head>
 	<title>MAKROskop</title>
-	<meta
-		name="description"
-		content="Udforsk dansk økonomi gennem MAKRO – den makroøkonomiske model bag Finansministeriets regnestykker."
-	/>
+	<meta name="description" content={description} />
 	<meta property="og:type" content="website" />
 	<meta property="og:site_name" content="MAKROskop" />
-	<meta property="og:title" content="MAKROskop – udforsk MAKRO uden licens" />
+	<meta property="og:title" content={ogTitle} />
+	<meta property="og:description" content={description} />
+	<meta property="og:image" content="{SITE_URL}/og.png" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
 	<meta
-		property="og:description"
-		content="Grundforløb, stød-scenarier og en uafhængig validering af DREAMs makroøkonomiske model MAKRO – beregnet med en fri løser."
+		property="og:image:alt"
+		content="MAKROskop: Dansk økonomi, beregnet et århundrede frem – kurve for realt BNP 1985–2100 fra MAKROs grundforløb."
 	/>
 	<meta property="og:locale" content="da_DK" />
-	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="theme-color" content="#14AFA6" />
 </svelte:head>
 
