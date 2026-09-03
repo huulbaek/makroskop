@@ -64,7 +64,9 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 ## Layout
 
 - `app/` — SvelteKit static site (Svelte 5 runes, bun). Pages: Grundforløb (baseline),
-  Scenarier (shock explorer), Validering (two-solver comparison). Build: `bun run build`.
+  Scenarier (shock explorer), Pakker (`/pakke/`: policy packages as a linear superposition of
+  solved shocks, `?Bundskat=-1&Offentligt_forbrug=0.5&variant=_perm`; pure logic in
+  `lib/package.ts`), Validering (two-solver comparison). Build: `bun run build`.
 - `etl/` — Python (uv). `extract.py` writes `app/static/data/*.json` from GDX files.
   `freesolver.py` is the license-free solver: parse / check / jacobian / newton /
   oracle / solve-export / export-baseline. Cache in `etl/cache/` (regenerable).

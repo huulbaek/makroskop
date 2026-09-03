@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { permalink, provenanceLine, scenarioCsv, exportFilename, wrapLines } from './export';
+import { permalink, provenanceLine, scenarioCsv, exportFilename, wrapLines, packagePermalink, packageFilename } from './export';
 
 describe('permalink', () => {
 	it('encodes shock, variant and a non-unit scale', () => {
@@ -93,5 +93,26 @@ describe('wrapLines', () => {
 			'https://very-long-url-without-spaces',
 			'x'
 		]);
+	});
+});
+
+describe('packagePermalink', () => {
+	it('points at the package page with the query as given', () => {
+		expect(packagePermalink('https://x.dk', 'Bundskat=-1&variant=_perm')).toBe(
+			'https://x.dk/pakke/?Bundskat=-1&variant=_perm'
+		);
+	});
+});
+
+describe('packageFilename', () => {
+	it('names the file after the components, closure and chart', () => {
+		expect(
+			packageFilename([{ name: 'Bundskat', scale: -1 }, { name: 'Moms', scale: 1 }], '_perm', 'qBNP', 'png')
+		).toBe('makroskop_pakke_Bundskat_x-1_Moms_perm_qBNP.png');
+	});
+	it('omits the chart key for the CSV', () => {
+		expect(packageFilename([{ name: 'Rente', scale: 1.5 }], '_ufin', null, 'csv')).toBe(
+			'makroskop_pakke_Rente_x1.5_ufin.csv'
+		);
 	});
 });

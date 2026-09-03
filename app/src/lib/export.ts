@@ -80,6 +80,29 @@ export function exportFilename(p: { stod: string; variant: string; key: string |
 	return `${parts.join('_').replace(/[^A-Za-z0-9_.-]+/g, '-')}.${p.ext}`;
 }
 
+/** Deep link to a package view; `query` comes from package.ts's packageQuery. */
+export function packagePermalink(origin: string, query: string): string {
+	return `${new URL('/pakke/', origin).toString()}?${query}`;
+}
+
+/** `makroskop_pakke_Bundskat_x-1_Moms_perm_qBNP.png` — every component with its size,
+ *  the closure, and the chart key (none for the CSV). */
+export function packageFilename(
+	components: { name: string; scale: number }[],
+	variant: string,
+	key: string | null,
+	ext: string
+): string {
+	const parts = ['makroskop_pakke'];
+	for (const c of components) {
+		parts.push(c.name);
+		if (c.scale !== 1) parts.push(`x${c.scale}`);
+	}
+	parts.push(variant.replace(/^_/, ''));
+	if (key) parts.push(key);
+	return `${parts.join('_').replace(/[^A-Za-z0-9_.-]+/g, '-')}.${ext}`;
+}
+
 // ---------------------------------------------------------------------------------------
 // Browser-only: PNG rasterisation of an inline SVG chart with a header and a source footer.
 

@@ -7,6 +7,7 @@
 	const links = [
 		{ href: '/', label: 'Grundforløb' },
 		{ href: '/scenarier/', label: 'Scenarier' },
+		{ href: '/pakke/', label: 'Pakker' },
 		{ href: '/validering/', label: 'Validering' }
 	];
 

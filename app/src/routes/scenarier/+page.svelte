@@ -409,6 +409,9 @@
 				<div class="share-row" role="group" aria-label="Del og hent">
 					<button class="chip" onclick={copyLink}>{copied ? 'Link kopieret ✓' : 'Kopiér link'}</button>
 					<button class="chip" onclick={downloadCsv}>Hent tal (CSV)</button>
+					{#if selectedVariation === '_perm' || selectedVariation === '_ufin'}
+						<a class="chip" href={`${resolve('/pakke/')}?${selectedName}=${scale}&variant=${selectedVariation}`}>Læg i en pakke →</a>
+					{/if}
 					<span class="share-hint">Linket gengiver præcis denne visning; hver graf kan hentes som PNG med kildeangivelse.</span>
 				</div>
 			{/if}
