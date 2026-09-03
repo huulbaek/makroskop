@@ -109,7 +109,6 @@
 </svelte:head>
 
 <section class="intro">
-	<p class="eyebrow">Uafhængig kontrol · {validation.model.name}</p>
 	<h1>Kan man stole på tallene?</h1>
 	<p class="lede">
 		MAKROskops frie beregningsmotor løser MAKROs ligninger uden kommerciel software. Vi har
@@ -121,7 +120,7 @@
 	</p>
 </section>
 
-<div class="tiles">
+<div class="figures">
 	<StatTile
 		label="Typisk uenighed mellem de to løsere"
 		value="1,1 × 10⁻¹⁵"
@@ -146,7 +145,7 @@
 	/>
 </div>
 
-<section class="method card">
+<section class="steps">
 	<h2>Sådan testede vi</h2>
 	<ol>
 		<li>
@@ -170,7 +169,7 @@
 	</ol>
 </section>
 
-<section class="card flagship">
+<section class="block flagship">
 	<h2>Hele modellen, hele horisonten</h2>
 	<p class="shock-spec mono">
 		{daInt.format(full.equations)} ligninger · {full.yearCount} år ({full.years}) · {full.machine}
@@ -234,7 +233,7 @@
 	</div>
 </section>
 
-<section class="card scenario">
+<section class="block scenario">
 	<h2>Det første rigtige scenarie: {solve.labelDa}</h2>
 	<p class="shock-spec mono">{solve.shock}</p>
 	<div class="result-grid">
@@ -311,7 +310,7 @@
 	</div>
 </section>
 
-<section class="card multipliers">
+<section class="block multipliers">
 	<h2>Sammenlignet med DREAMs egne multiplikatorer</h2>
 	<p class="story">
 		DREAM har offentliggjort finanspolitiske multiplikatorer for MAKRO i
@@ -380,7 +379,7 @@
 </section>
 
 {#if flagship}
-	<section class="card oracle">
+	<section class="block oracle">
 		<h2>To løsere, samme svar: {flagship.labelDa}</h2>
 		<p class="shock-spec mono">{flagship.shock} · 10-års udsnit {validation.system.windowYears}</p>
 		<div class="result-grid">
@@ -440,7 +439,7 @@
 
 <div class="minor-grid">
 	{#each others as oracle (oracle.id)}
-		<section class="card">
+		<section class="block">
 			<h2 class="minor-title">{oracle.labelDa}</h2>
 			<p class="shock-spec mono">{oracle.shock}</p>
 			<table class="results">
@@ -463,7 +462,7 @@
 		</section>
 	{/each}
 
-	<section class="card">
+	<section class="block">
 		<h2 class="minor-title">Genfinder løsningen i udsnittet</h2>
 		<p class="shock-spec">
 			Alle {daInt.format(validation.system.windowEquations)} variable forstyrres tilfældigt på en
@@ -487,7 +486,7 @@
 	</section>
 </div>
 
-<section class="card caveats">
+<section class="block caveats">
 	<h2>Forbehold — læs dem</h2>
 	<ul>
 		<li>
@@ -516,75 +515,70 @@
 </section>
 
 <style>
-	.eyebrow {
-		font-family: var(--font-mono);
-		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--makro-strong);
-		margin: 0 0 6px;
-	}
-
-	h1 {
-		font-size: clamp(24px, 3.4vw, 34px);
-	}
-
-	.lede {
-		color: var(--ink-secondary);
-		max-width: 62ch;
-		margin: 10px 0 0;
-	}
-
-	.tiles {
+	.figures {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 10px;
-		margin: 22px 0;
+		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+		border-top: 1px solid var(--rule-strong);
+		border-bottom: 1px solid var(--rule);
+		padding: 18px 0;
+		margin: 32px 0 36px;
 	}
 
-	.card {
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		padding: 16px 18px;
-		margin-bottom: 14px;
+	.figures > :global(.figure:first-child) {
+		border-left: 0;
+		padding-left: 0;
 	}
 
-	.card h2 {
-		font-size: 18px;
-		margin-bottom: 8px;
+	.steps {
+		margin-bottom: 36px;
+		max-width: 80ch;
 	}
 
-	.minor-title {
-		font-size: 15px;
+	.steps h2 {
+		margin-bottom: 12px;
 	}
 
-	.method ol {
+	.steps ol {
 		margin: 0;
-		padding-left: 20px;
+		padding-left: 22px;
 		color: var(--ink-secondary);
-		font-size: 14px;
+		font-size: 14.5px;
 		display: grid;
-		gap: 8px;
+		gap: 10px;
 	}
 
-	.method strong {
+	.steps strong {
 		color: var(--ink);
 	}
 
+	.block {
+		border-top: 1px solid var(--rule-strong);
+		padding-top: 18px;
+		margin-bottom: 36px;
+	}
+
+	.block h2 {
+		margin-bottom: 8px;
+	}
+
 	.flagship {
-		border-color: var(--makro);
+		border-top: 3px solid var(--makro);
 	}
 
 	.scenario {
-		border-color: var(--series-1);
+		border-top: 3px solid var(--series-1);
+	}
+
+	.minor-title {
+		font-size: 19px;
 	}
 
 	.story {
-		font-size: 14.5px;
+		font-size: 15px;
 		color: var(--ink-secondary);
 		margin: 0;
 		line-height: 1.6;
+		max-width: 68ch;
 	}
 
 	.story strong {
@@ -595,13 +589,13 @@
 	.shock-spec {
 		color: var(--ink-muted);
 		font-size: 12px;
-		margin: 0 0 12px;
+		margin: 0 0 16px;
 	}
 
 	.result-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 20px;
+		gap: 36px;
 	}
 
 	@media (max-width: 700px) {
@@ -627,8 +621,8 @@
 		text-align: left;
 		font-weight: 400;
 		color: var(--ink-secondary);
-		padding: 5px 10px 5px 0;
-		border-bottom: 1px solid var(--grid);
+		padding: 6px 10px 6px 0;
+		border-bottom: 1px solid var(--rule);
 	}
 
 	table.results td {
@@ -636,14 +630,14 @@
 		font-variant-numeric: tabular-nums;
 		font-weight: 600;
 		color: var(--ink);
-		padding: 5px 0;
-		border-bottom: 1px solid var(--grid);
+		padding: 6px 0;
+		border-bottom: 1px solid var(--rule);
 		white-space: nowrap;
 	}
 
 	.multipliers .story {
 		max-width: 72ch;
-		margin-bottom: 12px;
+		margin-bottom: 16px;
 	}
 
 	.table-scroll {
@@ -656,13 +650,14 @@
 
 	.multiplier-table th,
 	.multiplier-table td {
-		padding: 6px 14px 6px 0;
+		padding: 7px 14px 7px 0;
 	}
 
 	.multiplier-table thead th {
 		font-size: 12px;
 		color: var(--ink-muted);
 		vertical-align: bottom;
+		border-bottom-color: var(--rule-strong);
 	}
 
 	.multiplier-table thead th:not(:first-child),
@@ -714,12 +709,14 @@
 	}
 
 	.trace h3 {
+		font-family: var(--font-body);
+		font-weight: 600;
 		font-size: 13px;
 		margin-bottom: 4px;
 	}
 
 	.scenario .trace {
-		margin-top: 14px;
+		margin-top: 16px;
 	}
 
 	.trace-note {
@@ -735,34 +732,32 @@
 	.minor-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-		gap: 14px;
-		margin-bottom: 14px;
+		column-gap: 36px;
+		margin-bottom: 0;
 	}
 
-	.minor-grid .card {
-		margin-bottom: 0;
+	.minor-grid .block {
+		border-top-width: 1px;
 	}
 
 	.footnote {
 		font-size: 12px;
 		color: var(--ink-muted);
-		margin: 8px 0 0;
+		margin: 10px 0 0;
+		max-width: 80ch;
 	}
 
 	.caveats ul {
 		margin: 0;
 		padding-left: 20px;
 		color: var(--ink-secondary);
-		font-size: 13.5px;
+		font-size: 14px;
 		display: grid;
 		gap: 6px;
 	}
 
 	.caveats code {
 		color: var(--makro-strong);
-		background: var(--makro-wash);
-		padding: 1px 5px;
-		border-radius: 3px;
 		font-size: 12px;
 	}
 </style>

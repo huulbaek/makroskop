@@ -14,7 +14,8 @@
 	} = $props();
 </script>
 
-<div class="tile">
+<!-- A key figure set in type, separated from its neighbours by a hairline rather than a box. -->
+<div class="figure">
 	<div class="label">{label}</div>
 	<div class="value" class:good={tone === 'good'} class:bad={tone === 'bad'}>
 		{value}<span class="unit">{unit}</span>
@@ -23,25 +24,26 @@
 </div>
 
 <style>
-	.tile {
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		padding: 12px 14px;
+	.figure {
+		border-left: 1px solid var(--rule);
+		padding: 2px 16px 4px 14px;
 		min-width: 0;
 	}
 
 	.label {
-		font-size: 12px;
+		font-size: 12.5px;
 		color: var(--ink-secondary);
+		line-height: 1.3;
 	}
 
 	.value {
 		font-family: var(--font-display);
-		font-size: 26px;
-		font-weight: 600;
+		font-size: 34px;
+		font-weight: 500;
+		line-height: 1.1;
 		letter-spacing: -0.01em;
-		margin-top: 2px;
+		font-variant-numeric: tabular-nums;
+		margin-top: 6px;
 		color: var(--ink);
 	}
 
@@ -54,16 +56,17 @@
 	}
 
 	.unit {
-		font-size: 13px;
+		font-family: var(--font-body);
+		font-size: 12.5px;
 		font-weight: 400;
 		color: var(--ink-muted);
-		margin-left: 5px;
-		font-family: var(--font-body);
+		margin-left: 6px;
 	}
 
 	.note {
-		font-size: 11px;
+		font-size: 11.5px;
 		color: var(--ink-muted);
-		margin-top: 2px;
+		margin-top: 4px;
+		line-height: 1.35;
 	}
 </style>

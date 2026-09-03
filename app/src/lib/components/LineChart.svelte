@@ -281,7 +281,7 @@
 								cy={yPos(s.values[hoverIndex] as number)}
 								r="4.5"
 								fill={seriesColor(s, i)}
-								stroke="var(--surface)"
+								stroke="var(--page)"
 								stroke-width="2"
 							/>
 						{/if}
@@ -354,7 +354,7 @@
 	}
 
 	.title {
-		font-family: var(--font-display);
+		font-family: var(--font-body);
 		font-weight: 600;
 		font-size: 14px;
 		color: var(--ink);
@@ -364,9 +364,6 @@
 		font-family: var(--font-mono);
 		font-size: 11px;
 		color: var(--makro-strong);
-		background: var(--makro-wash);
-		padding: 1px 5px;
-		border-radius: 3px;
 	}
 
 	.unit {
@@ -391,8 +388,7 @@
 	.key {
 		display: inline-block;
 		width: 14px;
-		height: 3px;
-		border-radius: 2px;
+		height: 2px;
 	}
 
 	.plot {
@@ -402,7 +398,7 @@
 	.plot:focus-visible {
 		outline: 2px solid var(--makro);
 		outline-offset: 2px;
-		border-radius: 4px;
+		border-radius: var(--radius);
 	}
 
 	svg {
@@ -410,8 +406,8 @@
 	}
 
 	svg text.tick {
-		font-family: var(--font-body);
-		font-size: 11px;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
 		font-variant-numeric: tabular-nums;
 		fill: var(--ink-muted);
 	}
@@ -427,10 +423,10 @@
 		top: 8px;
 		pointer-events: none;
 		background: var(--surface-raised);
-		border: 1px solid var(--border);
-		border-radius: 6px;
+		border: 1px solid var(--rule);
+		border-radius: var(--radius);
 		padding: 7px 10px;
-		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+		box-shadow: var(--shadow);
 		min-width: 150px;
 		z-index: 2;
 	}
@@ -476,7 +472,7 @@
 		color: var(--ink-muted);
 		font-size: 13px;
 		background: var(--projection-wash);
-		border-radius: 6px;
+		border-radius: var(--radius);
 	}
 
 	.table-view {

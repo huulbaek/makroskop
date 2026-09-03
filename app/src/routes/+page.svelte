@@ -47,40 +47,17 @@
 	}
 </script>
 
-<section class="hero">
-	<div class="hero-text">
-		<p class="eyebrow">Grundforløbet · {meta.model.name}</p>
+<section class="opener">
+	<div class="opener-text">
 		<h1>Dansk økonomi, beregnet et århundrede frem</h1>
 		<p class="lede">
 			MAKRO er modellen bag Finansministeriets regnestykker. Her ses dens stiliserede grundforløb:
 			historiske data frem til {t}, modelfremskrivning derefter – helt til {meta.yearEnd}.
 		</p>
+		<p class="model-note">{meta.model.name}</p>
 	</div>
 
-	<div class="tiles">
-		<StatTile label="BNP ({t})" value={bnp == null ? '–' : formatValue(bnp)} unit="mia. kr." />
-		<StatTile
-			label="Beskæftigelse ({t})"
-			value={beskaeftigelse == null ? '–' : formatValue(beskaeftigelse / 1000)}
-			unit="mio. personer"
-		/>
-		<StatTile label="Bruttoledighed ({t})" value={ledighed == null ? '–' : formatValue(ledighed)} unit="pct." />
-		<StatTile
-			label="Offentlig saldo ({t})"
-			value={saldo == null ? '–' : formatSigned(saldo)}
-			unit="pct. af BNP"
-			tone={saldo != null && saldo >= 0 ? 'good' : 'bad'}
-		/>
-		<StatTile
-			label="Holdbarhed (HBI)"
-			value={hbi == null ? '–' : formatSigned(hbi * 100)}
-			unit="pct. af BNP"
-			tone={hbi != null && hbi >= 0 ? 'good' : 'bad'}
-			note="Finanspolitikken er {hbi != null && hbi >= 0 ? 'overholdbar' : 'uholdbar'} i grundforløbet"
-		/>
-	</div>
-
-	<div class="card hero-chart">
+	<div class="opener-chart">
 		<LineChart
 			title="Bruttonationalprodukt, realt"
 			code="qBNP"
@@ -96,8 +73,38 @@
 	</div>
 </section>
 
+<section class="figures" aria-label="Nøgletal">
+	<StatTile label="BNP ({t})" value={bnp == null ? '–' : formatValue(bnp)} unit="mia. kr." />
+	<StatTile
+		label="Beskæftigelse ({t})"
+		value={beskaeftigelse == null ? '–' : formatValue(beskaeftigelse / 1000)}
+		unit="mio. personer"
+	/>
+	<StatTile label="Bruttoledighed ({t})" value={ledighed == null ? '–' : formatValue(ledighed)} unit="pct." />
+	<StatTile
+		label="Offentlig saldo ({t})"
+		value={saldo == null ? '–' : formatSigned(saldo)}
+		unit="pct. af BNP"
+		tone={saldo != null && saldo >= 0 ? 'good' : 'bad'}
+	/>
+	<StatTile
+		label="Holdbarhed (HBI)"
+		value={hbi == null ? '–' : formatSigned(hbi * 100)}
+		unit="pct. af BNP"
+		tone={hbi != null && hbi >= 0 ? 'good' : 'bad'}
+		note="Finanspolitikken er {hbi != null && hbi >= 0 ? 'overholdbar' : 'uholdbar'} i grundforløbet"
+	/>
+</section>
+
 <section class="browser">
 	<div class="filters" role="group" aria-label="Filtre">
+		<div class="chip-row" role="group" aria-label="Emne">
+			{#each groups as group (group)}
+				<button class="chip" class:active={activeGroup === group} onclick={() => (activeGroup = group)}>
+					{group}
+				</button>
+			{/each}
+		</div>
 		<div class="chip-row" role="group" aria-label="Periode">
 			{#each rangePresets as preset (preset.label)}
 				<button
@@ -109,18 +116,11 @@
 				</button>
 			{/each}
 		</div>
-		<div class="chip-row" role="group" aria-label="Emne">
-			{#each groups as group (group)}
-				<button class="chip" class:active={activeGroup === group} onclick={() => (activeGroup = group)}>
-					{group}
-				</button>
-			{/each}
-		</div>
 	</div>
 
 	<div class="chart-grid">
 		{#each groupSeries as s (s.key)}
-			<div class="card">
+			<div class="cell">
 				<LineChart
 					title={sectorLabel(s)}
 					code={s.key}
@@ -137,7 +137,7 @@
 	</div>
 </section>
 
-<section class="method card">
+<section class="method">
 	<h2>Hvad kigger du på?</h2>
 	<p>
 		Grundforløbet er MAKROs indbyggede basisscenarie: en stiliseret fremskrivning af dansk økonomi, som
@@ -149,112 +149,75 @@
 </section>
 
 <style>
-	.hero {
-		display: flex;
-		flex-direction: column;
-		gap: 18px;
-	}
-
-	.eyebrow {
-		font-family: var(--font-mono);
-		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--makro-strong);
-		margin: 0 0 6px;
-	}
-
-	h1 {
-		font-size: clamp(26px, 4vw, 38px);
-		line-height: 1.12;
-		max-width: 22ch;
-	}
-
-	.lede {
-		color: var(--ink-secondary);
-		max-width: 58ch;
-		margin: 10px 0 0;
-	}
-
-	.tiles {
+	.opener {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-		gap: 10px;
+		grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+		gap: 48px;
+		align-items: end;
 	}
 
-	.card {
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		padding: 14px 16px;
+	.opener h1 {
+		max-width: 16ch;
+	}
+
+	.model-note {
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+		color: var(--ink-muted);
+		margin: 18px 0 0;
+	}
+
+	.opener-chart {
+		min-width: 0;
+	}
+
+	.figures {
+		display: grid;
+		grid-template-columns: repeat(5, minmax(0, 1fr));
+		margin-top: 36px;
+		padding: 18px 0;
+		border-top: 1px solid var(--rule-strong);
+		border-bottom: 1px solid var(--rule);
+	}
+
+	.figures > :global(.figure:first-child) {
+		border-left: 0;
+		padding-left: 0;
 	}
 
 	.browser {
-		margin-top: 30px;
+		margin-top: 40px;
 	}
 
 	.filters {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 10px 22px;
-		margin-bottom: 14px;
+		justify-content: space-between;
+		gap: 10px 24px;
+		margin-bottom: 20px;
 	}
 
-	.chip-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
+	@media (max-width: 900px) {
+		.opener {
+			grid-template-columns: 1fr;
+			gap: 28px;
+		}
+		.figures {
+			grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+			row-gap: 18px;
+		}
 	}
 
-	.chip {
-		font: inherit;
-		font-size: 13px;
-		padding: 5px 12px;
-		border-radius: 999px;
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--ink-secondary);
-		cursor: pointer;
-	}
-
-	.chip:hover {
-		border-color: var(--makro);
-		color: var(--ink);
-	}
-
-	.chip.active {
-		background: var(--makro-wash);
-		border-color: var(--makro);
-		color: var(--makro-strong);
-		font-weight: 600;
-	}
-
-	.chart-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-		gap: 12px;
-	}
-
-	.method {
-		margin-top: 30px;
-		max-width: 76ch;
-	}
-
-	.method h2 {
-		font-size: 17px;
-		margin-bottom: 6px;
-	}
-
-	.method p {
-		margin: 0;
-		color: var(--ink-secondary);
-		font-size: 14px;
-	}
-
-	.method code {
-		color: var(--makro-strong);
-		background: var(--makro-wash);
-		padding: 1px 5px;
-		border-radius: 3px;
+	@media (max-width: 600px) {
+		.figures > :global(.figure) {
+			border-left: 0;
+			padding-left: 0;
+			border-top: 1px solid var(--rule);
+			padding-top: 10px;
+		}
+		.figures > :global(.figure:first-child) {
+			border-top: 0;
+			padding-top: 0;
+		}
 	}
 </style>

@@ -361,7 +361,6 @@
 </svelte:head>
 
 <section class="intro">
-	<p class="eyebrow">Pakke-værksted</p>
 	<h1>Hvad koster pakken?</h1>
 	<p class="lede">
 		Sæt flere standardstød sammen til én politik-pakke – fx lavere bundskat betalt med mindre offentligt
@@ -386,7 +385,6 @@
 					aria-pressed={inPackage}
 					onclick={() => toggle(shock.name)}
 				>
-					<span class="dot" class:ready={usable} aria-hidden="true"></span>
 					{shock.labelDa}
 				</button>
 			{/each}
@@ -406,7 +404,7 @@
 		</div>
 
 		{#if components.length === 0}
-			<section class="card empty">
+			<section class="empty">
 				<h3>Pakken er tom</h3>
 				<p>Vælg stød i kataloget til venstre – eller start fra et eksempel:</p>
 				<ul class="examples">
@@ -481,7 +479,7 @@
 		{/if}
 
 		{#if ready}
-			<div class="hero" aria-label={`Hovedtal i ${heroYear}`}>
+			<div class="figures" aria-label={`Hovedtal i ${heroYear}`}>
 				{#each headline as ind (ind.key)}
 					{@const cell = ind.cells[HERO]}
 					<StatTile
@@ -494,7 +492,7 @@
 				{/each}
 			</div>
 
-			<section class="card facts" aria-label="Hovedtal">
+			<section class="facts" aria-label="Hovedtal">
 				<h3>Hovedtal – afvigelse fra grundforløbet</h3>
 				{#if costText}<p class="cost">{costText}</p>{/if}
 				<div class="table-wrap">
@@ -536,7 +534,7 @@
 				</p>
 			</section>
 
-			<section class="card contributions" aria-label="Bidrag fra de enkelte stød">
+			<section class="contributions" aria-label="Bidrag fra de enkelte stød">
 				<div class="contrib-head">
 					<h3>Hvad bidrager med hvad?</h3>
 					<div class="chip-row" role="group" aria-label="Indikator">
@@ -578,7 +576,7 @@
 
 			<div class="chart-grid" style:opacity={loading > 0 ? 0.5 : 1}>
 				{#each charts as chart (chart.key)}
-					<div class="card chart-card">
+					<div class="cell">
 						<LineChart
 							title={chart.title}
 							code={chart.key}
@@ -605,7 +603,7 @@
 			<p class="muted">Henter stødene …</p>
 		{/if}
 
-		<div class="method card">
+		<div class="method">
 			<h2>Sådan er pakken regnet</h2>
 			<p>
 				Hvert stød i kataloget er løst i MAKRO én gang, i sin egen størrelse. Pakken er den <em>lineære
@@ -625,162 +623,48 @@
 </div>
 
 <style>
-	.eyebrow {
-		font-family: var(--font-mono);
-		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--makro-strong);
-		margin: 0 0 6px;
-	}
-
-	h1 {
-		font-size: clamp(24px, 3.4vw, 34px);
-	}
-
-	.lede {
-		color: var(--ink-secondary);
-		max-width: 60ch;
-		margin: 10px 0 0;
-	}
-
-	.workbench {
-		display: grid;
-		grid-template-columns: 250px 1fr;
-		gap: 24px;
-		margin-top: 26px;
-		align-items: start;
-	}
-
-	@media (max-width: 780px) {
-		.workbench {
-			grid-template-columns: 1fr;
-		}
-	}
-
 	.aside-hint {
 		font-size: 12px;
 		color: var(--ink-muted);
-		margin: 0 0 4px;
-	}
-
-	aside h3 {
-		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.07em;
-		color: var(--ink-muted);
-		margin: 14px 0 4px;
-		font-family: var(--font-body);
-		font-weight: 600;
-	}
-
-	.shock {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		width: 100%;
-		text-align: left;
-		font: inherit;
-		font-size: 13px;
-		padding: 5px 8px;
-		border: 0;
-		border-radius: 6px;
-		background: none;
-		color: var(--ink-secondary);
-		cursor: pointer;
-	}
-
-	.shock:hover:not(:disabled) {
-		background: var(--makro-wash);
-		color: var(--ink);
-	}
-
-	.shock.selected {
-		background: var(--makro-wash);
-		color: var(--makro-strong);
-		font-weight: 600;
-	}
-
-	.shock:disabled {
-		opacity: 0.45;
-		cursor: not-allowed;
-	}
-
-	.dot {
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
-		background: var(--grid);
-		flex-shrink: 0;
-	}
-
-	.dot.ready {
-		background: var(--makro);
+		margin: 0 0 10px;
 	}
 
 	.detail-head {
 		display: flex;
 		flex-wrap: wrap;
-		align-items: center;
+		align-items: flex-end;
 		justify-content: space-between;
-		gap: 10px;
-		margin-bottom: 12px;
+		gap: 12px;
+		margin-bottom: 16px;
 	}
 
 	.detail-head h2 {
-		font-size: 20px;
+		font-size: 30px;
 	}
 
-	.chip-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
+	.empty {
+		border-top: 1px solid var(--rule-strong);
+		padding-top: 14px;
 	}
 
-	.chip {
-		font: inherit;
-		font-size: 12px;
-		padding: 4px 10px;
-		border-radius: 999px;
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--ink-secondary);
-		cursor: pointer;
-	}
-
-	.chip.active {
-		background: var(--makro-wash);
-		border-color: var(--makro);
-		color: var(--makro-strong);
-		font-weight: 600;
-	}
-
-	.card {
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		padding: 14px 16px;
-	}
-
-	.card h3 {
-		font-size: 15px;
-		margin-bottom: 8px;
+	.empty h3 {
+		margin-bottom: 6px;
 	}
 
 	.empty p {
 		color: var(--ink-secondary);
-		font-size: 14px;
-		margin: 0 0 8px;
+		font-size: 14.5px;
+		margin: 0 0 10px;
 	}
 
 	.examples {
 		margin: 0;
 		padding-left: 18px;
-		font-size: 14px;
+		font-size: 14.5px;
 	}
 
 	.examples li {
-		margin-bottom: 6px;
+		margin-bottom: 8px;
 	}
 
 	.examples .muted {
@@ -789,13 +673,11 @@
 		color: var(--ink-muted);
 	}
 
-	.muted {
-		color: var(--ink-muted);
-	}
-
 	.package {
-		border-color: var(--makro);
-		margin-bottom: 14px;
+		border-left: 3px solid var(--makro);
+		margin-bottom: 22px;
+		padding-top: 6px;
+		padding-bottom: 6px;
 	}
 
 	.rows {
@@ -805,13 +687,12 @@
 	}
 
 	.row {
-		padding: 10px 0;
-		border-top: 1px solid var(--grid);
+		padding: 12px 0;
+		border-top: 1px solid var(--rule);
 	}
 
 	.row:first-child {
 		border-top: 0;
-		padding-top: 0;
 	}
 
 	.row.inactive .row-name {
@@ -826,24 +707,26 @@
 	}
 
 	.row-name {
-		font-weight: 600;
-		font-size: 14.5px;
+		font-family: var(--font-display);
+		font-weight: 500;
+		font-size: 19px;
 	}
 
 	.remove {
 		font: inherit;
-		font-size: 11.5px;
-		padding: 2px 8px;
-		border-radius: 999px;
-		border: 1px solid var(--border);
-		background: var(--surface);
+		font-size: 12px;
+		padding: 2px 0;
+		border: 0;
+		border-bottom: 1px solid transparent;
+		border-radius: 0;
+		background: none;
 		color: var(--ink-muted);
 		cursor: pointer;
 	}
 
 	.remove:hover {
 		color: var(--bad);
-		border-color: var(--bad);
+		border-bottom-color: var(--bad);
 	}
 
 	.row-note {
@@ -855,11 +738,11 @@
 	.count-note {
 		font-size: 12.5px;
 		color: var(--ink-secondary);
-		margin: 8px 0 0;
+		margin: 10px 0 0;
 	}
 
 	.scaler {
-		margin-top: 6px;
+		margin-top: 8px;
 		display: grid;
 		/* Both columns content-independent: a track that changes width mid-drag makes
 		   the thumb slide out from under the pointer. */
@@ -906,39 +789,37 @@
 		}
 	}
 
-	.banner {
-		border: 1px solid var(--series-2);
-		background: color-mix(in srgb, var(--series-2) 8%, var(--surface));
-		border-radius: 8px;
-		padding: 10px 14px;
-		font-size: 13px;
-		margin-bottom: 14px;
-	}
-
-	.banner.warn {
-		border-color: var(--bad);
-		background: color-mix(in srgb, var(--bad) 8%, var(--surface));
-	}
-
-	.hero {
+	.figures {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-		gap: 10px;
-		margin-bottom: 12px;
+		grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+		border-top: 1px solid var(--rule-strong);
+		border-bottom: 1px solid var(--rule);
+		padding: 16px 0;
+		margin-bottom: 26px;
+	}
+
+	.figures > :global(.figure:first-child) {
+		border-left: 0;
+		padding-left: 0;
 	}
 
 	.facts,
 	.contributions {
-		margin-bottom: 12px;
+		margin-bottom: 28px;
+	}
+
+	.facts h3,
+	.contrib-head h3 {
+		margin-bottom: 8px;
 	}
 
 	.contrib-head {
 		display: flex;
 		flex-wrap: wrap;
-		align-items: center;
+		align-items: flex-end;
 		justify-content: space-between;
 		gap: 8px;
-		margin-bottom: 6px;
+		margin-bottom: 8px;
 	}
 
 	.contrib-head h3 {
@@ -959,8 +840,8 @@
 	th,
 	td {
 		text-align: right;
-		padding: 6px 10px;
-		border-bottom: 1px solid var(--grid);
+		padding: 8px 12px;
+		border-bottom: 1px solid var(--rule);
 		vertical-align: top;
 	}
 
@@ -968,13 +849,20 @@
 		text-align: left;
 		font-weight: 500;
 		color: var(--ink);
+		padding-left: 0;
 	}
 
 	thead th {
 		font-size: 12px;
 		color: var(--ink-muted);
-		font-weight: 600;
-		border-bottom: 1px solid var(--axis);
+		font-weight: 500;
+		border-bottom: 1px solid var(--rule-strong);
+		padding-top: 0;
+	}
+
+	td:last-child,
+	th:last-child {
+		padding-right: 0;
 	}
 
 	.unit {
@@ -997,105 +885,31 @@
 
 	tr.total th,
 	tr.total td {
-		border-top: 2px solid var(--axis);
+		border-top: 2px solid var(--ink);
 		border-bottom: 0;
-		font-weight: 700;
+		font-weight: 600;
 	}
 
 	.cost {
-		font-size: 15px;
-		line-height: 1.45;
+		font-family: var(--font-display);
+		font-size: 20px;
+		line-height: 1.4;
 		color: var(--ink);
-		margin: 0 0 10px;
-		max-width: 70ch;
+		margin: 0 0 14px;
+		max-width: 60ch;
 	}
 
 	thead th.lead {
 		text-align: left;
+		padding-left: 0;
+		color: var(--ink);
+		font-size: 13.5px;
 	}
 
 	.facts-note {
 		font-size: 12px;
 		color: var(--ink-muted);
-		margin: 8px 0 0;
+		margin: 10px 0 0;
 		max-width: 80ch;
-	}
-
-	.share-row {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 8px;
-		margin-bottom: 10px;
-	}
-
-	.share-hint {
-		font-size: 12px;
-		color: var(--ink-muted);
-	}
-
-	.chart-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-		gap: 12px;
-		transition: opacity 0.15s;
-	}
-
-	.chart-card {
-		position: relative;
-	}
-
-	.card-tools {
-		display: flex;
-		justify-content: flex-end;
-		margin-top: 4px;
-	}
-
-	.png-btn {
-		font: inherit;
-		font-size: 11.5px;
-		padding: 2px 8px;
-		border-radius: 999px;
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--ink-muted);
-		cursor: pointer;
-	}
-
-	.png-btn:hover:not(:disabled) {
-		color: var(--ink);
-		border-color: var(--ink-muted);
-	}
-
-	.png-btn:disabled {
-		cursor: progress;
-	}
-
-	.kilde {
-		font-family: var(--font-mono);
-		font-size: 11.5px;
-		color: var(--ink-muted);
-		margin: 12px 0 0;
-		overflow-wrap: anywhere;
-	}
-
-	.kilde a {
-		color: inherit;
-	}
-
-	.method {
-		margin-top: 18px;
-		max-width: 76ch;
-	}
-
-	.method h2 {
-		font-size: 16px;
-		margin-bottom: 6px;
-	}
-
-	.method p {
-		margin: 0 0 8px;
-		color: var(--ink-secondary);
-		font-size: 13.5px;
 	}
 </style>

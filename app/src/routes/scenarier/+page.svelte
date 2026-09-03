@@ -236,7 +236,6 @@
 </svelte:head>
 
 <section class="intro">
-	<p class="eyebrow">Scenarie-værksted</p>
 	<h1>Hvad sker der, hvis&nbsp;…?</h1>
 	<p class="lede">
 		MAKRO leveres med et katalog af standardstød: veldefinerede politik-eksperimenter, der viser modellens
@@ -252,7 +251,6 @@
 			class:selected={selectedName === '_demo'}
 			onclick={() => select('_demo', '')}
 		>
-			<span class="dot demo-dot" aria-hidden="true"></span>
 			Syntetisk demo-scenarie
 		</button>
 
@@ -262,14 +260,10 @@
 				<button
 					class="shock"
 					class:selected={selectedName === shock.name}
+					class:pending={shock.available.length === 0}
+					title={shock.available.length > 0 ? '' : 'Afventer modelkørsel'}
 					onclick={() => select(shock.name, shock.available[0] ?? meta.variations[1]?.suffix ?? '_midl')}
 				>
-					<span
-						class="dot"
-						class:ready={shock.available.length > 0}
-						title={shock.available.length > 0 ? 'Data beregnet' : 'Afventer modelkørsel'}
-						aria-hidden="true"
-					></span>
 					{shock.labelDa}
 				</button>
 			{/each}
@@ -417,10 +411,10 @@
 			{/if}
 			<div class="chart-grid" class:is-demo={scenario.synthetic} style:opacity={loading ? 0.5 : 1}>
 				{#each charts as chart (chart.key)}
-					<div class="card chart-card" class:instrument={chart.isInstrument}>
-						{#if scenario.synthetic}<span class="demo-badge" aria-hidden="true">DEMO</span>{/if}
-						{#if chart.isInstrument}<span class="instrument-badge">Stødet (input)</span>{/if}
-						{#if scale !== 1 && !chart.isInstrument}<span class="scaled-badge">×{daScale.format(scale)} {mirrored ? 'spejlet' : 'tilnærmet'}</span>{/if}
+					<div class="cell" class:instrument={chart.isInstrument}>
+						{#if scenario.synthetic}<span class="badge warm" aria-hidden="true">Demo</span>{/if}
+						{#if chart.isInstrument}<span class="badge accent">Stødet (input)</span>{/if}
+						{#if scale !== 1 && !chart.isInstrument}<span class="badge warm">×{daScale.format(scale)} {mirrored ? 'spejlet' : 'tilnærmet'}</span>{/if}
 						<LineChart
 							title={chart.title}
 							code={chart.key}
@@ -464,7 +458,7 @@
 			</div>
 		{/if}
 
-		<div class="method card">
+		<div class="method">
 			<h2>Sådan skal kurverne læses</h2>
 			<p>
 				Kurverne viser forskellen mellem scenariet og grundforløbet – i procent for mængder og priser, i
@@ -480,40 +474,47 @@
 </div>
 
 <style>
-	.eyebrow {
-		font-family: var(--font-mono);
-		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--makro-strong);
-		margin: 0 0 6px;
+	.demo-entry {
+		margin-bottom: 14px;
 	}
 
-	h1 {
-		font-size: clamp(24px, 3.4vw, 34px);
+	.detail-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 12px;
+		margin-bottom: 14px;
 	}
 
-	.lede {
+	.detail-head h2 {
+		font-size: 30px;
+	}
+
+	.explainer {
+		font-family: var(--font-display);
+		font-size: 19px;
+		line-height: 1.45;
 		color: var(--ink-secondary);
-		max-width: 60ch;
-		margin: 10px 0 0;
+		max-width: 62ch;
+		margin: 0 0 20px;
 	}
 
 	.definition {
-		margin-bottom: 14px;
-		border-color: var(--makro);
+		margin-bottom: 18px;
+		border-left: 3px solid var(--makro);
 	}
 
 	.definition h3 {
-		font-size: 15px;
-		margin-bottom: 8px;
+		font-size: 20px;
+		margin-bottom: 10px;
 	}
 
 	.definition dl {
 		margin: 0;
 		display: grid;
 		grid-template-columns: max-content 1fr;
-		gap: 6px 14px;
+		gap: 6px 18px;
 		font-size: 13.5px;
 	}
 
@@ -538,9 +539,6 @@
 
 	.definition code {
 		color: var(--makro-strong);
-		background: var(--makro-wash);
-		padding: 1px 5px;
-		border-radius: 3px;
 	}
 
 	.definition .muted {
@@ -548,22 +546,17 @@
 		font-size: 12px;
 	}
 
-	.banner.warn {
-		border-color: var(--bad);
-		background: color-mix(in srgb, var(--bad) 8%, var(--surface));
-	}
-
 	.dream-note {
 		font-size: 12.5px;
 		color: var(--ink-muted);
-		margin: 10px 0 0;
+		margin: 12px 0 0;
 		max-width: 80ch;
 	}
 
 	.scaler {
-		margin-top: 12px;
-		padding-top: 12px;
-		border-top: 1px solid var(--grid);
+		margin-top: 14px;
+		padding-top: 14px;
+		border-top: 1px solid var(--rule);
 		display: grid;
 		/* Both flexible columns are content-independent on purpose: with a max-content
 		   readout the track resized as the readout text changed, and a track that
@@ -591,6 +584,16 @@
 		white-space: nowrap;
 	}
 
+	.scale-readout .approx {
+		margin-left: 6px;
+		white-space: nowrap;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--series-2);
+	}
+
 	.scale-readout .approx.blank {
 		visibility: hidden;
 	}
@@ -607,16 +610,6 @@
 		color: var(--bad);
 	}
 
-	.scale-readout .approx {
-		margin-left: 6px;
-		white-space: nowrap;
-		font-family: var(--font-mono);
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--series-2);
-	}
-
 	.scale-note {
 		grid-column: 1 / -1;
 		margin: 4px 0 0;
@@ -625,43 +618,36 @@
 		max-width: 80ch;
 	}
 
-	.scaled-badge {
-		position: absolute;
-		top: 8px;
-		right: 10px;
-		font-family: var(--font-mono);
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--series-2);
-		background: color-mix(in srgb, var(--series-2) 10%, var(--surface));
-		padding: 2px 6px;
-		border-radius: 3px;
+	.hbi-row {
+		max-width: 320px;
+		margin-bottom: 18px;
+		border-top: 1px solid var(--rule-strong);
+		padding-top: 12px;
 	}
 
-	@media (max-width: 520px) {
-		.scaler {
-			grid-template-columns: 1fr;
-		}
+	.hbi-row :global(.figure) {
+		border-left: 0;
+		padding-left: 0;
 	}
 
-	.chart-card.instrument {
-		border-color: var(--makro);
-		position: relative;
+	.cell.instrument {
+		border-top: 3px solid var(--makro);
 	}
 
-	.instrument-badge {
-		position: absolute;
-		top: 8px;
-		right: 10px;
-		font-family: var(--font-mono);
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--makro-strong);
-		background: var(--makro-wash);
-		padding: 2px 6px;
-		border-radius: 3px;
+	/* keep the caption clear of a badge */
+	.is-demo .cell :global(figcaption),
+	.cell.instrument :global(figcaption) {
+		padding-right: 110px;
+	}
+
+	.pending h3 {
+		margin-bottom: 8px;
+	}
+
+	.pending p {
+		color: var(--ink-secondary);
+		font-size: 14px;
+		margin: 0 0 8px;
 	}
 
 	@media (max-width: 520px) {
@@ -672,262 +658,8 @@
 		.definition dt {
 			margin-top: 6px;
 		}
-	}
-
-	.workbench {
-		display: grid;
-		grid-template-columns: 250px 1fr;
-		gap: 24px;
-		margin-top: 26px;
-		align-items: start;
-	}
-
-	@media (max-width: 780px) {
-		.workbench {
+		.scaler {
 			grid-template-columns: 1fr;
 		}
-	}
-
-	aside h3 {
-		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.07em;
-		color: var(--ink-muted);
-		margin: 14px 0 4px;
-		font-family: var(--font-body);
-		font-weight: 600;
-	}
-
-	.shock {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		width: 100%;
-		text-align: left;
-		font: inherit;
-		font-size: 13px;
-		padding: 5px 8px;
-		border: 0;
-		border-radius: 6px;
-		background: none;
-		color: var(--ink-secondary);
-		cursor: pointer;
-	}
-
-	.shock:hover {
-		background: var(--makro-wash);
-		color: var(--ink);
-	}
-
-	.shock.selected {
-		background: var(--makro-wash);
-		color: var(--makro-strong);
-		font-weight: 600;
-	}
-
-	.dot {
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
-		background: var(--grid);
-		flex-shrink: 0;
-	}
-
-	.dot.ready {
-		background: var(--makro);
-	}
-
-	.demo-dot {
-		background: var(--series-2);
-	}
-
-	.demo-entry {
-		margin-bottom: 4px;
-	}
-
-	.detail-head {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		justify-content: space-between;
-		gap: 10px;
-		margin-bottom: 12px;
-	}
-
-	.detail-head h2 {
-		font-size: 20px;
-	}
-
-	.chip-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-	}
-
-	.chip {
-		font: inherit;
-		font-size: 12px;
-		padding: 4px 10px;
-		border-radius: 999px;
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--ink-secondary);
-		cursor: pointer;
-	}
-
-	.chip.active {
-		background: var(--makro-wash);
-		border-color: var(--makro);
-		color: var(--makro-strong);
-		font-weight: 600;
-	}
-
-	.chip:disabled {
-		opacity: 0.45;
-		cursor: not-allowed;
-	}
-
-	.banner {
-		border: 1px solid var(--series-2);
-		background: color-mix(in srgb, var(--series-2) 8%, var(--surface));
-		border-radius: 8px;
-		padding: 10px 14px;
-		font-size: 13px;
-		margin-bottom: 14px;
-	}
-
-	.banner code {
-		font-size: 12px;
-	}
-
-	.hbi-row {
-		max-width: 320px;
-		margin-bottom: 12px;
-	}
-
-	.explainer {
-		max-width: 72ch;
-		font-size: 15px;
-		line-height: 1.5;
-		color: var(--ink-secondary);
-		margin: -4px 0 14px;
-	}
-
-	.share-row {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 8px;
-		margin-bottom: 10px;
-	}
-	.share-hint {
-		font-size: 12px;
-		color: var(--ink-muted);
-	}
-
-	.card-tools {
-		display: flex;
-		justify-content: flex-end;
-		margin-top: 4px;
-	}
-	.png-btn {
-		font: inherit;
-		font-size: 11.5px;
-		padding: 2px 8px;
-		border-radius: 999px;
-		border: 1px solid var(--border);
-		background: var(--surface);
-		color: var(--ink-muted);
-		cursor: pointer;
-	}
-	.png-btn:hover:not(:disabled) {
-		color: var(--ink);
-		border-color: var(--ink-muted);
-	}
-	.png-btn:disabled {
-		cursor: progress;
-	}
-
-	.kilde {
-		font-family: var(--font-mono);
-		font-size: 11.5px;
-		color: var(--ink-muted);
-		margin: 12px 0 0;
-		overflow-wrap: anywhere;
-	}
-	.kilde a {
-		color: inherit;
-	}
-
-	.card {
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		padding: 14px 16px;
-	}
-
-	.chart-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-		gap: 12px;
-		transition: opacity 0.15s;
-	}
-
-	.chart-card {
-		position: relative;
-	}
-
-	/* keep the caption clear of the DEMO badge */
-	.is-demo .chart-card :global(figcaption) {
-		padding-right: 56px;
-	}
-
-	.demo-badge {
-		position: absolute;
-		top: 10px;
-		right: 12px;
-		font-family: var(--font-mono);
-		font-size: 10px;
-		letter-spacing: 0.1em;
-		color: var(--series-2);
-		border: 1px solid var(--series-2);
-		border-radius: 4px;
-		padding: 1px 6px;
-		opacity: 0.85;
-		z-index: 1;
-	}
-
-	.pending h3 {
-		font-size: 16px;
-		margin-bottom: 6px;
-	}
-
-	.pending p {
-		color: var(--ink-secondary);
-		font-size: 14px;
-		margin: 0 0 8px;
-	}
-
-	.method {
-		margin-top: 18px;
-		max-width: 76ch;
-	}
-
-	.method h2 {
-		font-size: 16px;
-		margin-bottom: 6px;
-	}
-
-	.method p {
-		margin: 0;
-		color: var(--ink-secondary);
-		font-size: 13.5px;
-	}
-
-	code {
-		color: var(--makro-strong);
-		background: var(--makro-wash);
-		padding: 1px 5px;
-		border-radius: 3px;
 	}
 </style>
