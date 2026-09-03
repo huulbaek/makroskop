@@ -8,7 +8,7 @@ Live instance (Danish UI): **https://makroskop.nodalit.com**
 
 > **Dansk:** MAKROskop viser MAKROs grundforløb og stød-scenarier som afvigelser fra
 > grundforløbet, lader dig sammensætte politikpakker af løste stød, og dokumenterer den frie
-> løser mod GAMS/IPOPT. Ingen GAMS-licens kræves, hverken for at vise eller beregne.
+> løser mod GAMS/IPOPT. Der er ikke brug for en GAMS-licens, hverken for at vise eller beregne.
 
 ## What it does
 
