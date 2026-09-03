@@ -517,16 +517,46 @@
 <style>
 	.figures {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+		grid-template-columns: repeat(4, minmax(0, 1fr));
 		border-top: 1px solid var(--rule-strong);
 		border-bottom: 1px solid var(--rule);
-		padding: 18px 0;
 		margin: 32px 0 36px;
 	}
 
 	.figures > :global(.figure:first-child) {
-		border-left: 0;
 		padding-left: 0;
+	}
+
+	.figures > :global(.figure:last-child) {
+		border-right: 0;
+		padding-right: 0;
+	}
+
+	@media (max-width: 1100px) {
+		.figures {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+		.figures > :global(.figure:nth-child(2n)) {
+			border-right: 0;
+			padding-right: 0;
+		}
+		.figures > :global(.figure:nth-child(2n + 1)) {
+			padding-left: 0;
+		}
+	}
+
+	@media (max-width: 600px) {
+		.figures {
+			grid-template-columns: 1fr;
+		}
+		.figures > :global(.figure) {
+			border-right: 0;
+			padding: 14px 0;
+			border-top: 1px solid var(--rule);
+		}
+		.figures > :global(.figure:first-child) {
+			border-top: 0;
+		}
 	}
 
 	.steps {

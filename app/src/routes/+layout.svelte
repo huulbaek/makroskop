@@ -59,27 +59,22 @@
 			produkt fra DREAM eller Finansministeriet.
 		</p>
 		<dl class="stamp">
-			<div>
-				<dt>Model</dt>
-				<dd class="mono">{data.meta.model.name} {data.meta.model.commit}</dd>
-			</div>
-			<div>
-				<dt>Sidste dataår</dt>
-				<dd class="mono">{data.meta.lastDataYear}</dd>
-			</div>
-			<div>
-				<dt>MAKROskop</dt>
-				<dd class="mono">{__APP_COMMIT__ ? `${__APP_COMMIT__}, ` : ''}bygget {__BUILD_DATE__}</dd>
-			</div>
+			<dt>Model</dt>
+			<dd class="mono">{data.meta.model.name} {data.meta.model.commit}</dd>
+			<dt>Sidste dataår</dt>
+			<dd class="mono">{data.meta.lastDataYear}</dd>
+			<dt>MAKROskop</dt>
+			<dd class="mono">{__APP_COMMIT__ ? `${__APP_COMMIT__}, ` : ''}bygget {__BUILD_DATE__}</dd>
 		</dl>
 	</footer>
 </div>
 
 <style>
 	.shell {
-		max-width: 1180px;
+		/* 1440px frame, 80px gutters → 1280px content width shared by every section */
+		max-width: 1440px;
 		margin: 0 auto;
-		padding: 0 24px;
+		padding: 0 clamp(20px, 5.5vw, 80px);
 		display: flex;
 		flex-direction: column;
 		min-height: 100dvh;
@@ -141,46 +136,54 @@
 
 	main {
 		flex: 1;
-		padding: 40px 0 64px;
+		padding: 40px 0 0;
 	}
 
 	footer {
 		border-top: 1px solid var(--rule-strong);
-		padding: 22px 0 36px;
-		font-size: 12.5px;
-		line-height: 1.5;
+		margin-top: 96px;
+		padding: 32px 0 36px;
+		font-size: 13px;
+		line-height: 1.6;
 		color: var(--ink-muted);
 		display: grid;
-		grid-template-columns: minmax(0, 64ch) auto;
-		justify-content: space-between;
-		gap: 24px 48px;
+		grid-template-columns: 1fr 1fr;
+		gap: 48px;
 	}
 
 	.about {
 		margin: 0;
+		max-width: 520px;
 	}
 
 	.stamp {
 		margin: 0;
 		display: grid;
-		gap: 6px;
-		font-size: 11.5px;
+		grid-template-columns: max-content 1fr;
+		column-gap: 32px;
+		row-gap: 6px;
 		align-content: start;
-	}
-
-	.stamp div {
-		display: grid;
-		grid-template-columns: 90px auto;
-		gap: 12px;
+		justify-self: end;
 	}
 
 	.stamp dt {
+		margin: 0;
 		color: var(--ink-muted);
 	}
 
 	.stamp dd {
 		margin: 0;
 		color: var(--ink-secondary);
+	}
+
+	@media (max-width: 1100px) {
+		footer {
+			grid-template-columns: 1fr;
+			gap: 24px;
+		}
+		.stamp {
+			justify-self: start;
+		}
 	}
 
 	@media (max-width: 700px) {
@@ -201,7 +204,7 @@
 			padding-top: 28px;
 		}
 		footer {
-			grid-template-columns: 1fr;
+			margin-top: 64px;
 		}
 	}
 </style>

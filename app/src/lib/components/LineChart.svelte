@@ -190,10 +190,13 @@
 </script>
 
 <figure class="chart" bind:clientWidth={width}>
+	<!-- Fixed two-line header (title + code / unit) so plots in the same row start at the same y. -->
 	<figcaption>
-		<span class="title">{title}</span>
-		{#if code}<span class="code">{code}</span>{/if}
-		{#if unit}<span class="unit">{unit}</span>{/if}
+		<div class="head">
+			<span class="title" title={title}>{title}</span>
+			{#if code}<span class="code">{code}</span>{/if}
+		</div>
+		<div class="unit">{unit || '\u00a0'}</div>
 	</figcaption>
 
 	{#if series.length > 1}
@@ -347,27 +350,39 @@
 
 	figcaption {
 		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		margin-bottom: 12px;
+	}
+
+	.head {
+		display: flex;
 		align-items: baseline;
 		gap: 8px;
-		flex-wrap: wrap;
-		margin-bottom: 2px;
+		min-width: 0;
+		white-space: nowrap;
 	}
 
 	.title {
 		font-family: var(--font-body);
 		font-weight: 600;
-		font-size: 14px;
+		font-size: 15px;
 		color: var(--ink);
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.code {
+		flex: none;
 		font-family: var(--font-mono);
-		font-size: 11px;
+		font-size: 12px;
 		color: var(--makro-strong);
 	}
 
 	.unit {
 		font-size: 12px;
+		line-height: 1.35;
 		color: var(--ink-muted);
 	}
 
@@ -476,7 +491,7 @@
 	}
 
 	.table-view {
-		margin-top: 4px;
+		margin-top: 10px;
 	}
 
 	.table-view summary {

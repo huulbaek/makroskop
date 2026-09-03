@@ -182,15 +182,15 @@ em {
 .chip-row {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: 8px;
 }
 
 .chip {
 	font: inherit;
 	font-size: 13px;
 	line-height: 1.2;
-	padding: 6px 11px;
-	border-radius: var(--radius);
+	padding: 8px 14px;
+	border-radius: 3px;
 	border: 1px solid var(--rule);
 	background: transparent;
 	color: var(--ink-secondary);

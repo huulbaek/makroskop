@@ -22,6 +22,16 @@
 		meta.series.filter((s) => s.group === activeGroup && s.key in baseline.series && s.key !== 'qBNP')
 	);
 
+	/** 4 columns for 8/12/16 charts, 3 for 6/9/18; otherwise whichever leaves fewer empty slots. */
+	function columnsFor(count: number): number {
+		if (count % 4 === 0) return 4;
+		if (count % 3 === 0) return 3;
+		const empty4 = (4 - (count % 4)) % 4;
+		const empty3 = (3 - (count % 3)) % 3;
+		return empty3 < empty4 ? 3 : 4;
+	}
+	const columns = $derived(columnsFor(groupSeries.length));
+
 	function valueAt(key: string, year: number): number | null {
 		const column = baseline.series[key];
 		if (!column) return null;
@@ -74,7 +84,7 @@
 		value={hbi == null ? '–' : formatSigned(hbi * 100)}
 		unit="pct. af BNP"
 		tone={hbi != null && hbi >= 0 ? 'good' : 'bad'}
-		note="Finanspolitikken er {hbi != null && hbi >= 0 ? 'overholdbar' : 'uholdbar'} i grundforløbet"
+		tag={hbi == null ? '' : hbi >= 0 ? 'Overholdbar' : 'Uholdbar'}
 	/>
 </section>
 
@@ -115,7 +125,7 @@
 		</div>
 	</div>
 
-	<div class="chart-grid">
+	<div class="chart-grid" style:--cols={columns}>
 		{#each groupSeries as s (s.key)}
 			<div class="cell">
 				<LineChart
@@ -127,7 +137,7 @@
 					fromYear={range.from}
 					toYear={range.to}
 					lastDataYear={t}
-					height={210}
+					height={180}
 				/>
 			</div>
 		{/each}
@@ -146,57 +156,155 @@
 </section>
 
 <style>
-	.opener h1 {
-		max-width: 18ch;
+	/* Hero: title takes 3/5 of the width, the lede sits bottom-aligned in the remaining 2/5. */
+	.opener {
+		display: grid;
+		grid-template-columns: 3fr 2fr;
+		gap: 48px;
+		align-items: end;
+		padding: 24px 0 48px; /* main already adds 40px under the masthead → 64px in total */
 	}
 
+	.opener h1 {
+		font-size: clamp(40px, 4.6vw, 64px);
+		line-height: 1.05;
+		letter-spacing: -0.02em;
+	}
+
+	.opener .lede {
+		font-size: 18px;
+		line-height: 1.55;
+		max-width: 520px;
+		margin: 0 0 8px;
+	}
+
+	/* KPI strip: five equal cells between two rules */
 	.figures {
 		display: grid;
 		grid-template-columns: repeat(5, minmax(0, 1fr));
-		margin-top: 36px;
-		padding: 18px 0;
 		border-top: 1px solid var(--rule-strong);
+		border-bottom: 1px solid var(--rule-strong);
 	}
 
 	.figures > :global(.figure:first-child) {
-		border-left: 0;
 		padding-left: 0;
 	}
 
+	.figures > :global(.figure:last-child) {
+		border-right: 0;
+		padding-right: 0;
+	}
+
+	/* Hero chart: header 12px above the plot (LineChart), table toggle 12px below */
 	.century {
-		border-top: 1px solid var(--rule-strong);
-		padding: 14px 0 18px;
+		padding: 40px 0 0;
 	}
 
-	.browser {
-		margin-top: 40px;
+	.century :global(.table-view) {
+		margin-top: 12px;
 	}
 
+	/* Filter bar */
 	.filters {
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: space-between;
-		gap: 10px 24px;
-		margin-bottom: 20px;
+		gap: 12px 24px;
+		padding: 56px 0 24px;
+		border-bottom: 1px solid var(--rule);
 	}
 
-	@media (max-width: 900px) {
+	/* Chart sheet: column count chosen per tab so the last row is full */
+	.chart-grid {
+		grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr));
+		column-gap: 40px;
+		row-gap: 40px;
+		padding-top: 32px;
+	}
+
+	.chart-grid > .cell {
+		padding: 14px 0 0;
+	}
+
+	/* Explainer: heading left, text right, on the same two-column rhythm as the hero */
+	.method {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 48px;
+		max-width: none;
+		margin-top: 64px;
+		padding-top: 72px;
+	}
+
+	.method h2 {
+		font-size: 28px;
+		line-height: 1.2;
+		margin: 0;
+	}
+
+	.method p {
+		font-size: 16px;
+		line-height: 1.6;
+		margin: 0;
+	}
+
+	@media (max-width: 1100px) {
+		.opener,
+		.method {
+			grid-template-columns: 1fr;
+			gap: 20px;
+		}
+		.opener .lede {
+			margin-bottom: 0;
+		}
+		.method {
+			padding-top: 48px;
+		}
 		.figures {
-			grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-			row-gap: 18px;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+		.figures > :global(.figure) {
+			border-right: 1px solid var(--rule);
+			padding: 20px 24px;
+		}
+		.figures > :global(.figure:nth-child(3n)) {
+			border-right: 0;
+			padding-right: 0;
+		}
+		.figures > :global(.figure:nth-child(3n + 1)) {
+			padding-left: 0;
+		}
+		.chart-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			column-gap: 32px;
 		}
 	}
 
-	@media (max-width: 600px) {
-		.figures > :global(.figure) {
-			border-left: 0;
-			padding-left: 0;
-			border-top: 1px solid var(--rule);
-			padding-top: 10px;
+	@media (max-width: 640px) {
+		.figures {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
-		.figures > :global(.figure:first-child) {
-			border-top: 0;
-			padding-top: 0;
+		.figures > :global(.figure) {
+			border-right: 1px solid var(--rule);
+			padding: 16px 16px;
+		}
+		.figures > :global(.figure:nth-child(3n)),
+		.figures > :global(.figure:nth-child(3n + 1)) {
+			border-right: 1px solid var(--rule);
+			padding: 16px 16px;
+		}
+		.figures > :global(.figure:nth-child(2n)) {
+			border-right: 0;
+			padding-right: 0;
+		}
+		.figures > :global(.figure:nth-child(2n + 1)) {
+			padding-left: 0;
+		}
+		.filters {
+			padding-top: 40px;
+		}
+		.chart-grid {
+			grid-template-columns: 1fr;
 		}
 	}
 </style>
