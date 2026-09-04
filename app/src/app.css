@@ -1,5 +1,7 @@
 /* MAKROskop design tokens — one paper plane, hairline rules, serif display.
-   Light first, dark via media query. */
+   Light first; dark when <html data-theme="dark">. The attribute is set before first paint
+   by the inline script in app.html (stored choice, else the OS preference) and flipped by
+   ThemeToggle, so the OS media query is never consulted here. */
 :root {
 	color-scheme: light;
 
@@ -46,36 +48,34 @@
 	--radius: 2px;
 }
 
-@media (prefers-color-scheme: dark) {
-	:root {
-		color-scheme: dark;
-		--makro: #23c2b8;
-		--makro-strong: #5fdad1;
-		--makro-wash: rgba(35, 194, 184, 0.12);
+:root[data-theme='dark'] {
+	color-scheme: dark;
+	--makro: #23c2b8;
+	--makro-strong: #5fdad1;
+	--makro-wash: rgba(35, 194, 184, 0.12);
 
-		--page: #121615;
-		--surface: #121615;
-		--surface-raised: #1a1f1e;
+	--page: #121615;
+	--surface: #121615;
+	--surface-raised: #1a1f1e;
 
-		--ink: #eceeed;
-		--ink-secondary: #b1bab8;
-		--ink-muted: #7f8987;
+	--ink: #eceeed;
+	--ink-secondary: #b1bab8;
+	--ink-muted: #7f8987;
 
-		--rule: rgba(236, 238, 237, 0.14);
-		--rule-strong: rgba(236, 238, 237, 0.5);
-		--grid: #262c2b;
-		--axis: #6b7573;
+	--rule: rgba(236, 238, 237, 0.14);
+	--rule-strong: rgba(236, 238, 237, 0.5);
+	--grid: #262c2b;
+	--axis: #6b7573;
 
-		--series-1: #4b8fe6;
-		--series-2: #e5703f;
-		--series-wash: rgba(75, 143, 230, 0.14);
-		--warm-text: #e5703f;
+	--series-1: #4b8fe6;
+	--series-2: #e5703f;
+	--series-wash: rgba(75, 143, 230, 0.14);
+	--warm-text: #e5703f;
 
-		--good: #3fb85a;
-		--bad: #ea6b5d;
-		--projection-wash: rgba(236, 238, 237, 0.04);
-		--shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-	}
+	--good: #3fb85a;
+	--bad: #ea6b5d;
+	--projection-wash: rgba(236, 238, 237, 0.04);
+	--shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 
 * {
