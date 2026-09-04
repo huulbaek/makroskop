@@ -1,0 +1,198 @@
+{
+ "_provenance": {
+  "source": "DREAM, 'Shock Reactions in MAKRO', 20 May 2025 (Høegh, Partsch, Bonde), dreamgruppen.dk/Media/638833322447461188/shock_reactions_in_makro_may_2025.pdf",
+  "modelVersion": "MAKRO 2024-December (the note's own statement, p. 2); MAKROskop runs MAKRO 2026-June",
+  "method": "Values read off the figures (pages 19, 22, 28, 35, 43, 50) at 200 dpi, makroskop-7cd, 2026-09-04. Accuracy about +-10 % of the plotted range; treat as approximate.",
+  "units": {
+   "nL": "1,000 persons vs baseline",
+   "qBNP": "pct.-points of baseline GDP",
+   "qC_gdp": "private consumption, pct.-points of baseline GDP",
+   "qX_gdp": "exports, pct.-points of baseline GDP",
+   "vhW": "pct. vs baseline (hourly wage)"
+  },
+  "shockYear": 2030,
+  "closure": "permanent, unfinanced (no tax reaction)",
+  "dreamShockOverOurs": "DREAM normalises fiscal/foreign-demand shocks to 1 pct. of GDP (standard_shocks.gms); the factor converts MAKROskop's raw-instrument shock (catalog.SHOCK_RUNS) to DREAM's size using _reference.gdx 2030 values: vBNP 2747.2, vX(xTot) 2179.2, qR(off) 223.26, pR(off) 1.0441, vLoensum(off) 419.26, vtBund(tot) 175.49 (model units)",
+  "ourNormalisation": "ours(scaled) = MAKROskop pct. deviation x factor; nL: x baseline nL(tot) 2030 = 3144.9 thousand; qX/qC to GDP points: x vX/vBNP = 0.793 and x vC/vBNP = 0.4545"
+ },
+ "dreamShockOverOurs": {
+  "Eksportmarkedsvaekst": 1.261,
+  "Offentlig_varekoeb": 11.785,
+  "Offentlig_Beskaeftigelse": 6.553,
+  "Rente": 1.0,
+  "Importpris": 1.0,
+  "Arbejdsudbud_beskaeftigelse": 1.0
+ },
+ "readings": {
+  "Eksportmarkedsvaekst": {
+   "nL": {
+    "2030": 3.5,
+    "2031": 5.5,
+    "2032": 4.2,
+    "2033": 2.5,
+    "2035": 0.0,
+    "2040": -0.6,
+    "2050": 0.0
+   },
+   "qBNP": {
+    "2030": 0.19,
+    "2031": 0.26,
+    "2032": 0.25,
+    "2035": 0.12,
+    "2040": 0.05,
+    "2050": 0.07,
+    "2080": 0.08
+   },
+   "qX_gdp": {
+    "2030": 0.42,
+    "2031": 0.55,
+    "2035": 0.45,
+    "2040": 0.35,
+    "2050": 0.35,
+    "2080": 0.42
+   },
+   "vhW": {
+    "2030": 0.2,
+    "2031": 0.6,
+    "2033": 0.87,
+    "2035": 0.8,
+    "2040": 0.45,
+    "2045": 0.29,
+    "2060": 0.35
+   }
+  },
+  "Offentlig_varekoeb": {
+   "nL": {
+    "2030": 7.0,
+    "2031": 9.5,
+    "2032": 7.0,
+    "2033": 4.5,
+    "2035": 0.0,
+    "2040": -1.0,
+    "2050": 0.0
+   },
+   "qBNP": {
+    "2030": 0.55,
+    "2031": 0.57,
+    "2033": 0.5,
+    "2035": 0.35,
+    "2040": 0.15,
+    "2050": 0.12,
+    "2080": 0.15
+   },
+   "qC_gdp": {
+    "2034": 0.32,
+    "2050": 0.13
+   },
+   "qX_gdp": {
+    "2035": -0.5,
+    "2050": -0.65
+   },
+   "vhW": {
+    "2031": 1.0,
+    "2033": 1.45,
+    "2040": 0.6,
+    "2050": 0.45
+   }
+  },
+  "Offentlig_Beskaeftigelse": {
+   "nL": {
+    "2030": 36,
+    "2031": 22,
+    "2032": 12,
+    "2033": 5,
+    "2035": -1,
+    "2038": -2.5
+   },
+   "vhW": {
+    "2033": 3.1
+   }
+  },
+  "Rente": {
+   "nL": {
+    "2030": -10.5,
+    "2031": -13.3,
+    "2032": -9,
+    "2033": -4,
+    "2036": 1.2,
+    "2040": 0.5
+   },
+   "qBNP": {
+    "2030": -0.6,
+    "2031": -0.9,
+    "2033": -0.97,
+    "2040": -1.05,
+    "2050": -1.2,
+    "2080": -1.2
+   },
+   "qC_gdp": {
+    "2030": -0.4,
+    "2032": -0.75,
+    "2040": -0.45,
+    "2050": -0.2,
+    "2080": 0.35
+   },
+   "qX_gdp": {
+    "2031": 0.07,
+    "2040": -0.35,
+    "2050": -0.85,
+    "2080": -2.05
+   },
+   "vhW": {
+    "2030": -0.5,
+    "2031": -1.4,
+    "2033": -1.95,
+    "2040": -1.63,
+    "2050": -1.85,
+    "2080": -1.8
+   }
+  },
+  "Importpris": {
+   "nL": {
+    "2030": -0.15,
+    "2031": -0.38,
+    "2032": -0.45,
+    "2035": -0.32,
+    "2040": -0.15,
+    "2045": 0
+   },
+   "qBNP": {
+    "2030": -0.02,
+    "2035": -0.15,
+    "2040": -0.25,
+    "2050": -0.31,
+    "2080": -0.41
+   },
+   "qC_gdp": {
+    "2035": -0.25,
+    "2040": -0.35,
+    "2050": -0.41,
+    "2080": -0.47
+   },
+   "qX_gdp": {
+    "2040": -0.35,
+    "2050": -0.52,
+    "2080": -0.72
+   }
+  },
+  "Arbejdsudbud_beskaeftigelse": {
+   "nL": {
+    "2030": 15,
+    "2031": 28,
+    "2032": 30,
+    "2040": 32,
+    "2080": 33
+   },
+   "qBNP": {
+    "2035": 0.55,
+    "2040": 0.8,
+    "2050": 0.95,
+    "2080": 1.0
+   },
+   "vhW": {
+    "2033": -1.3,
+    "2050": -0.3
+   }
+  }
+ }
+}

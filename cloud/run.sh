@@ -20,10 +20,11 @@ uv run python freesolver.py export-baseline --out shock_gdx/_reference.gdx
 
 echo "=============================================================="
 echo "STEP 3  First real scenario: permanent ECB-rate shock +100bp from 2030"
+echo "        (--from-year 2030 = DREAM shock_year; 2029 stays at the reference as t0)"
 echo "        (continuation solver; output feeds MAKROskop directly)"
 echo "=============================================================="
 uv run python freesolver.py solve-export \
-  --from-year 2029 \
+  --from-year 2030 \
   --shock-name rRenteECB --shock-years 2030-2129 --shock-delta 0.01 \
   --out shock_gdx/Rente_ufin.gdx
 
@@ -31,7 +32,7 @@ echo "=============================================================="
 echo "STEP 4  Second scenario: Brent oil price +10 pct. from 2030, permanent"
 echo "=============================================================="
 uv run python freesolver.py solve-export \
-  --from-year 2029 \
+  --from-year 2030 \
   --shock-name pOlieBrent --shock-years 2030-2129 --shock-factor 1.10 \
   --out shock_gdx/Oliepris_ufin.gdx
 

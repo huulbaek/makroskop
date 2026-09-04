@@ -1189,7 +1189,11 @@ def variable_ids(convert_dir: Path, wanted: set[str]) -> dict[str, int]:
 
 def tax_reaction_closure(system: "System", convert_dir: Path, from_year: int) -> ExtraEquations:
     """Apply DREAM's tax reaction to the system (unfix vtLukning) and return its equations."""
-    first_year = from_year + 1  # the window's first year is pre-shock, as in DREAM (shock_year-1)
+    # from_year is DREAM's shock_year (t1): the window's first solved year, with from_year-1 frozen at
+    # the reference as DREAM's t0. B_tax_reaction holds tLukning constant over tx0E = t1..tEnd-1, so
+    # the closure rows start in from_year itself. (Batches 2-4 passed --from-year 2029 for a 2030
+    # shock, which solved 2029 as a free anticipation year — makroskop-7cd.)
+    first_year = from_year
     years = range(first_year, LAST_MODEL_YEAR + 1)
     wanted = {f"vtLukning(tot,{t})" for t in years} | {f"tLukning({t})" for t in years}
     wanted |= {f"vOff13Net({LAST_MODEL_YEAR})", f"vBNP({LAST_MODEL_YEAR})"}
@@ -1206,6 +1210,12 @@ def tax_reaction_closure(system: "System", convert_dir: Path, from_year: int) ->
 
 class Window:
     """A trailing time-window of the system: equations/free vars with year >= from_year.
+
+    from_year is the first *solved* year and must be the first shock year (DREAM's shock_year):
+    every variable dated from_year-1 stays at its reference value, exactly like DREAM's fixed t0 in
+    set_time_periods(shock_year-1, terminal_year), whose equations only exist for tx0 = t > t0.
+    Starting the window a year before the shock instead solves that year too — a shock announced
+    one year ahead (asset prices, investment, hiring and wages move before the instrument does).
 
     The pole j-term equations (POLE_JTERMS) are excluded and their j-terms frozen.
     """
@@ -1921,7 +1931,10 @@ def main() -> None:
     parser.add_argument("--max-iter", type=int, default=8)
     parser.add_argument("--tol", type=float, default=1e-9)
     parser.add_argument("--lu-method", default="umfpack")
-    parser.add_argument("--from-year", type=int, default=2110)
+    parser.add_argument("--from-year", type=int, default=2110,
+                        help="first solved year = the first shock year (DREAM's shock_year); the year "
+                             "before stays at the reference like DREAM's t0. Use 2030 for the 2030 "
+                             "shocks, not 2029 (that solves 2029 as an anticipation year)")
     parser.add_argument("--endogenize", default="",
                         help="exo/endo swap: free this parameter instance-for-instance so the "
                              "(endogenous) --shock-name hits its target, e.g. "

@@ -13,13 +13,16 @@ export PYTHONUNBUFFERED=1
 # Shared box: if memory runs out, the kernel should kill the (resumable) solver, not Dokploy.
 echo 1000 > /proc/self/oom_score_adj 2>/dev/null || true
 
+# --from-year 2030 = DREAM's shock_year: 2030 is the first solved year and 2029 stays at the reference
+# (DREAM's fixed t0). Batches 2-4 were run with --from-year 2029, which solved 2029 as a free year and
+# made every 2030 shock anticipated by one year (makroskop-7cd); re-runs must use 2030.
 run() {
   local out="$1"; shift
   if [ -f "shock_gdx/$out" ]; then echo "SKIP $out (already exported)"; return; fi
   echo "=============================================================="
   echo "SCENARIO $out"
   echo "=============================================================="
-  uv run python freesolver.py solve-export --from-year 2029 "$@" --out "shock_gdx/$out" \
+  uv run python freesolver.py solve-export --from-year 2030 "$@" --out "shock_gdx/$out" \
     || echo "FAILED: $out (continuing with the rest)"
 }
 

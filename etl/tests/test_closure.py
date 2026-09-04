@@ -63,3 +63,45 @@ def test_missing_instance_is_an_error():
     except SystemExit:
         return
     raise AssertionError("expected SystemExit for a missing instance")
+
+
+class _FakeSystem:
+    """Just enough of freesolver.System for tax_reaction_closure."""
+
+    def __init__(self, levels, is_fixed):
+        self.levels = levels
+        self.is_fixed = is_fixed
+        self.reindexed = False
+
+    def _index_free(self):
+        self.reindexed = True
+
+
+CLOSURE_DICT_TXT = """CNS written by GAMS Convert
+Equations 1 to 1
+  e1  E_a(2129)
+Variables 1 to 8
+  x1  tLukning(2127)
+  x2  tLukning(2128)
+  x3  tLukning(2129)
+  x4  vtLukning(tot,2127)
+  x5  vtLukning(tot,2128)
+  x6  vtLukning(tot,2129)
+  x7  vOff13Net(2129)
+  x8  vBNP(2129)
+"""
+
+
+def test_closure_starts_in_the_windows_first_year(tmp_path):
+    # --from-year is DREAM's shock_year: the window's first solved year, with from_year-1 frozen
+    # as DREAM's t0. B_tax_reaction then holds tLukning constant from shock_year (tx0E), so the
+    # closure rows must start at from_year itself, not one year later.
+    (tmp_path / "dict.txt").write_text(CLOSURE_DICT_TXT, encoding="utf-8")
+    levels = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 400.0, 100.0])
+    is_fixed = np.array([False, False, False, True, True, True, False, False])
+    system = _FakeSystem(levels, is_fixed)
+    extra = fs.tax_reaction_closure(system, tmp_path, from_year=2127)
+    assert extra.years.tolist() == [2127, 2128, 2129]
+    assert extra.names[0] == "closure:tLukning(2127)=tLukning(2129)"
+    assert system.is_fixed.tolist() == [False] * 8  # all three vtLukning(tot,t) freed
+    assert system.reindexed

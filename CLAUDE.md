@@ -132,6 +132,19 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
   vtLukning and appends DREAM's two linear equations (tLukning[t] = tLukning[2129]; vOff13Net/vBNP
   at 2129 = reference) as `ExtraEquations` rows on the Window (`window.residuals/jacobian_csc`);
   the last model year is 2129, not 2130. `System.jacobian_csc` shape follows `len(free_ids)`.
+- Window convention (makroskop-7cd): `--from-year` is DREAM's shock_year — the first *solved* year;
+  the year before stays at the reference like DREAM's fixed t0 (`set_time_periods(shock_year-1, ...)`
+  only has equations for tx0). Batches 2-4 (all 75 published scenarios) used `--from-year 2029` for
+  2030 shocks, so 2029 was solved as a free year and every shock was anticipated one year ahead:
+  house prices, investment, hiring and wages move in 2029. Measured on an end-of-horizon replica
+  (uXMarked +1 %): the anticipated run's year-1 wage response is 2.5× DREAM's and the employment
+  peak is 22 % lower than the unanticipated run's. Re-run with `--from-year 2030`. Comparisons with
+  DREAM must also scale to their shock sizes (1 % of GDP: export market ×1.26, offentligt varekøb
+  ×11.8, offentlig beskæftigelse ×6.55, bundskat ×1.88 of ours) — see `etl/dream_may2025.json`.
+- The zip is the plain shock model: the CONVERT dump is `M_base` with `G_endo` (no `*_deep`
+  calibration equations, `E_tLukning` present, `uDeltag`/`uh`/`rLoenNash`/`qProdHh_t` exogenous,
+  `snLHh`/`shLHh` endogenous), evaluated at the deep-calibration point. Same endogeneity as
+  DREAM's standard_shocks.gms — "calibration-configuration exogeneity" is not a source of gaps.
 
 ## Conventions
 
