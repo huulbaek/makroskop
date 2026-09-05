@@ -117,6 +117,13 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 - GAMS gotcha: `*` is a comment only in column 1; indented `*` is multiplication.
 - Memory safety on 16GB laptops: run factorizations in killable subprocesses or with
   swap-growth watchdogs; the first uncapped run swap-froze and crashed the machine.
+- LU lifetime (makroskop-xn2): a full-horizon UMFPACK factorization peaks at 40–53 GB *on its own*
+  (final LU ~28 GB, base 3–7 GB) on the 62 GB box, so a stale LU must never survive into the next
+  factorization. `solve_window` owns the LU through `lu_holder` (taken out on entry, handed back on
+  return) and clears `solve_fn`/`matrix`/`jac_window` before `make_direct_solver`; before that fix a
+  rebuild held 2–3 LUs (61 GB, two OOM kills). Verified 2026-09-05 on Rente_perm: 15 factorizations,
+  RSS back to 3–10 GB between each, peak 53.4 GB. Diagnose memory with 30 s RSS samples of the
+  solver pid (`memtest/sample.sh` on the box), not with the end-of-run peak alone.
 - Shock design: instruments must be exogenous (`is_fixed`). Mapped: tBund, tAMbidrag,
   tSelskab, tEjd, uG (offentligt forbrug), uvOvfSats (overførsler), uXMarked, nPop
   (single ages), rRenteECB, pOlieBrent (NB: propagates to almost nothing in this

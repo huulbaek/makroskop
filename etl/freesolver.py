@@ -1293,18 +1293,27 @@ def worst_residuals(window: "Window", residual_full: np.ndarray, top: int = 5) -
 
 
 def solve_window(system: System, window: Window, x: np.ndarray,
-                 tol: float = 1e-9, max_iter: int = 10, lu_reuse=None):
-    """Newton on the window, mutating x in place. Returns (final ||r||_inf, last solver).
+                 tol: float = 1e-9, max_iter: int = 10, lu_holder: list | None = None) -> float:
+    """Newton on the window, mutating x in place. Returns the final ||r||_inf.
 
+    `lu_holder` is an empty or one-element list carrying a factorization between calls:
+    it is taken out on entry, so this frame is the LU's only owner, and put back on return.
     A carried-over factorization (chord iterations) is tried first and rebuilt from a
     fresh Jacobian whenever progress is poor — cheap on continuation ladders where the
     Jacobian barely changes between stages.
+
+    Memory: a full-horizon LU is ~28 GB of the box's 62 GB, so a stale factorization — and
+    every local that references it — is released BEFORE the next one is built. Holding
+    both peaked at 61 GB and OOM-killed two Rente_perm attempts (makroskop-xn2).
     """
+    if lu_holder is None:
+        lu_holder = []
     residual_full = np.empty(window.n_eq_total)
     window.residuals(x, residual_full)
     norm = np.abs(residual_full[window.eq_sel]).max()
     print(f"start: ||r||_inf = {norm:.3e}", flush=True)
-    lu = lu_reuse
+    lu = lu_holder.pop() if lu_holder else None
+    solve_fn = matrix = jac_window = None
     fresh = False
     history: list[float] = [norm]
     tiny_steps = 0  # consecutive accepted iterations with alpha <= 1/32 and < 10 % progress
@@ -1314,8 +1323,12 @@ def solve_window(system: System, window: Window, x: np.ndarray,
             break
         t0 = time.time()
         if lu is None:
+            # drop every reference to the previous factorization (the linear_solve closure
+            # shares these cells) before the next one is built
+            solve_fn = matrix = jac_window = None
             jac = window.jacobian_csc(x)
             jac_window = jac[window.eq_perm, :][:, window.var_perm].tocsc()
+            del jac
             lu = (make_direct_solver(jac_window), jac_window)
             fresh = True
         factor_time = time.time() - t0
@@ -1388,7 +1401,7 @@ def solve_window(system: System, window: Window, x: np.ndarray,
             if fresh:
                 print(f"  line search failed with fresh Jacobian (factor {factor_time:.1f}s); stopping",
                       flush=True)
-                return norm, lu
+                break
             lu = None  # stale chord LU: rebuild and retry
             continue
 
@@ -1409,8 +1422,10 @@ def solve_window(system: System, window: Window, x: np.ndarray,
         tiny_steps = tiny_steps + 1 if (alpha <= 1 / 32 and reduction > 0.9) else 0
         if tiny_steps >= 2:
             print("  stalled on tiny steps (2 iterations, < 10 % progress); stopping", flush=True)
-            return norm, lu
-    return norm, lu
+            break
+    if lu is not None:
+        lu_holder.append(lu)
+    return norm
 
 
 def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.ndarray,
@@ -1428,7 +1443,7 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.nd
     step = 0.01
     checkpoint = x.copy()
     previous: tuple[float, np.ndarray] | None = None  # the converged stage before `checkpoint`
-    lu = None
+    carried: list = []  # at most one factorization, owned by solve_window while it runs
     attempts = 0
     residual = np.empty(window.n_eq_total)
 
@@ -1476,7 +1491,7 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.nd
                 print(f"  secant predictor: start {secant_norm:.3e} (zero-order {zero_norm:.3e})", flush=True)
             else:
                 print(f"  zero-order predictor: start {zero_norm:.3e} (secant {secant_norm:.3e})", flush=True)
-        norm, lu = solve_window(system, window, x, tol=tol, max_iter=8, lu_reuse=lu)
+        norm = solve_window(system, window, x, tol=tol, max_iter=8, lu_holder=carried)
         if norm < tol:
             previous = (solved_share, checkpoint)
             solved_share = share
@@ -1487,7 +1502,7 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.nd
                 on_stage(solved_share, checkpoint)
         else:
             step /= 2
-            lu = None
+            carried.clear()
             if step < 1e-4:
                 raise SystemExit(f"continuation stalled at share {solved_share}")
             save_checkpoint()  # a restart must not replay the failed step sizes
@@ -1507,7 +1522,7 @@ def cmd_newton(perturb: float, max_iter: int, tol: float, from_year: int, conver
         x[window.window_vars] += noise
         print(f"perturbed {len(window.window_vars):,} window variables, relative scale {perturb:g}")
 
-    norm, _ = solve_window(system, window, x, tol=tol, max_iter=max_iter)
+    norm = solve_window(system, window, x, tol=tol, max_iter=max_iter)
 
     recovery = np.abs(x[window.window_vars] - system.levels[window.window_vars])
     denom = np.abs(system.levels[window.window_vars]) + 1e-8
