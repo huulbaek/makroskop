@@ -1,5 +1,5 @@
 #!/bin/bash
-# Scenario batch 2: eight shocks, sequential, checkpointed. Run detached on the box:
+# Scenario batch 2: nine headline shocks (Rente_ufin moved here from run.sh), sequential, checkpointed. Run detached on the box:
 #   nohup bash cloud/run_batch2.sh > batch2.log 2>&1 &
 # Safe to relaunch after any kill — every scenario resumes from its last converged stage.
 set -uo pipefail
@@ -26,6 +26,7 @@ run() {
     || echo "FAILED: $out (continuing with the rest)"
 }
 
+run Rente_ufin.gdx                           --shock-name rRenteECB  --shock-years 2030-2129 --shock-delta 0.01
 run Bundskat_ufin.gdx                        --shock-name tBund      --shock-years 2030-2129 --shock-delta 0.01
 run AM_bidrag_ufin.gdx                       --shock-name tAMbidrag  --shock-years 2030-2129 --shock-delta 0.01
 run Selskabsskat_ufin.gdx                    --shock-name tSelskab   --shock-years 2030-2129 --shock-delta 0.01
