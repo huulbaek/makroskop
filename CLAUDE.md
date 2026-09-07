@@ -145,7 +145,10 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
   2030 shocks, so 2029 was solved as a free year and every shock was anticipated one year ahead:
   house prices, investment, hiring and wages move in 2029. Measured on an end-of-horizon replica
   (uXMarked +1 %): the anticipated run's year-1 wage response is 2.5× DREAM's and the employment
-  peak is 22 % lower than the unanticipated run's. Re-run with `--from-year 2030`. Comparisons with
+  peak is 22 % lower than the unanticipated run's. All 76 scenarios were re-solved with
+  `--from-year 2030` on 2026-09-05..07 (`cloud/run_all_2030.sh`; `etl/verify_2030.py` checks the
+  stamps and the zero-2029 invariant); the 2029 runs are parked in `etl/cache/parked/shock_gdx_2029`
+  and on the box in `etl/shock_gdx_2029`. Comparisons with
   DREAM must also scale to their shock sizes (1 % of GDP: export market ×1.26, offentligt varekøb
   ×11.8, offentlig beskæftigelse ×6.55, bundskat ×1.88 of ours) — see `etl/dream_may2025.json`.
 - The zip is the plain shock model: the CONVERT dump is `M_base` with `G_endo` (no `*_deep`
