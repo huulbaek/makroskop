@@ -315,7 +315,7 @@ def write_demo_scenario(out_dir: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--makro-root", type=Path, default=Path("/Users/huulbaek/vserver/MAKRO"))
+    parser.add_argument("--makro-root", type=Path, default=Path(__file__).parent.parent.parent / "MAKRO")
     parser.add_argument("--out", type=Path, default=Path(__file__).parent.parent / "app" / "static" / "data")
     parser.add_argument("--shocks-dir", type=Path, default=Path(__file__).parent / "shock_gdx")
     parser.add_argument("--demo", action="store_true", help="also write a synthetic, flagged demo scenario")

@@ -37,7 +37,7 @@
 	/** Public origin, for tags that must be absolute (og:image). */
 	const SITE_URL = 'https://makroskop.nodalit.com';
 
-	const REPO_URL = 'https://github.com/huulbaek/makroskop';
+	const REPO_URL = 'https://github.com/nodalit/makroskop';
 
 	const SITE_DESCRIPTION =
 		'MAKROskop er en fri, licensløs udgave af MAKRO – den makroøkonomiske model bag Finansministeriets regnestykker: grundforløb, stød-scenarier og politikpakker.';

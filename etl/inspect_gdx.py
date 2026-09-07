@@ -9,7 +9,7 @@ from pathlib import Path
 import gams.transfer as gt
 import gamspy_base
 
-MAKRO_ROOT = Path("/Users/huulbaek/vserver/MAKRO")
+MAKRO_ROOT = Path(__file__).resolve().parent.parent.parent / "MAKRO"
 
 HEADLINE_VARIABLES = [
     "qBNP", "vBNP", "qG", "qBVT", "sqBVT", "nL", "snL", "qC", "qXy", "qM",
