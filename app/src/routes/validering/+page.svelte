@@ -104,6 +104,22 @@
 	function mult(value: number | null | undefined): string {
 		return value === null || value === undefined ? '–' : daTwo.format(value);
 	}
+
+	const dream = $derived(data.dreamComparison);
+
+	/** Series label and DREAM unit for a comparison row. */
+	function dreamSeries(key: string): { labelDa: string; unitDa: string } {
+		return dream.series.find((s) => s.key === key) ?? { labelDa: key, unitDa: '' };
+	}
+
+	/** Reading or scaled value with Danish decimal comma — one decimal for persons, two for
+	 *  percentages; "–" where DREAM's figure was not read. */
+	function reading(value: number | null | undefined, key: string): string {
+		if (value === null || value === undefined) return '–';
+		const rounded = key === 'nL' ? Math.round(value * 10) / 10 : Math.round(value * 100) / 100;
+		const clean = rounded === 0 ? 0 : rounded; // never "-0,0"
+		return key === 'nL' ? daOne.format(clean) : daTwo.format(clean);
+	}
 </script>
 
 <svelte:head>
@@ -378,6 +394,78 @@
 		Kilde:
 		<a href={multipliers.reference.url} target="_blank" rel="noopener noreferrer"
 			>{multipliers.reference.source}<span class="sr-only"> (åbner i nyt vindue)</span></a
+		>.
+	</p>
+</section>
+
+<section class="block dream">
+	<h2>Sammenlignet med DREAMs stød-reaktioner (maj 2025)</h2>
+	<p class="story">
+		I maj 2025 offentliggjorde DREAM notatet
+		<a href={dream.reference.url} target="_blank" rel="noopener noreferrer"
+			>Shock Reactions in MAKRO<span class="sr-only"> (åbner i nyt vindue)</span></a
+		> med figurer for, hvordan {dream.reference.modelDa} reagerer på en række standardstød fra
+		{dream.shockYear}. Her står de aflæste værdier ved siden af MAKROskops egne, ufinansierede
+		scenarier omregnet til DREAMs enheder: beskæftigelse i 1.000 personer, eksport og privat
+		forbrug i pct.-point af BNP, BNP og timeløn i pct. Hvor DREAM normaliserer stødet til 1 pct.
+		af BNP, er MAKROskops tal skaleret lineært op til samme størrelse. {dream.shockYear} er
+		stødåret (år 1).
+	</p>
+	<div class="dream-grid">
+		{#each dream.shocks as shock (shock.id)}
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+			<!-- Focusable on purpose: the table scrolls sideways on narrow screens. -->
+			<div class="table-scroll" tabindex="0" role="region" aria-label="{shock.labelDa}, sammenligning med DREAM">
+				<table class="results dream-table">
+					<caption>
+						<strong>{shock.labelDa}</strong> · {shock.scaleNoteDa}
+					</caption>
+					<thead>
+						<tr>
+							<th scope="col">Serie</th>
+							<th scope="col"><span class="sr-only">Kilde</span></th>
+							{#each dream.columns as year (year)}
+								<th scope="col">{year}</th>
+							{/each}
+						</tr>
+					</thead>
+					<tbody>
+						{#each shock.rows as row (row.series)}
+							{@const label = dreamSeries(row.series)}
+							<tr>
+								<th scope="row" rowspan="2">
+									{label.labelDa}<span class="unit">{label.unitDa}</span>
+								</th>
+								<td class="who">DREAM</td>
+								{#each dream.columns as year (year)}
+									<td>{reading(row.dream[String(year)], row.series)}</td>
+								{/each}
+							</tr>
+							<tr class="ours">
+								<td class="who">MAKROskop</td>
+								{#each dream.columns as year (year)}
+									<td>{reading(row.ours[String(year)], row.series)}</td>
+								{/each}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+				{#if shock.noteDa}<p class="footnote">{shock.noteDa}</p>{/if}
+			</div>
+		{/each}
+	</div>
+	<p class="footnote">
+		<strong>Forbehold.</strong> DREAMs tal er {dream.reference.methodDa}, og notatet bygger på
+		{dream.reference.modelDa}, mens MAKROskop regner på juni 2026-versionen. Den lineære
+		opskalering er en tilnærmelse: MAKRO er tæt på lineær for små stød, men for de offentlige
+		varekøb (faktor 11,8) og den offentlige beskæftigelse (faktor 6,6) er den grov. Forskelle på
+		10–40 pct. bør derfor ikke overfortolkes; systematiske forskelle i forløbet over tid — fx hvor
+		hurtigt beskæftigelsen vender tilbage — er mere sigende.
+	</p>
+	<p class="footnote">
+		Kilde:
+		<a href={dream.reference.url} target="_blank" rel="noopener noreferrer"
+			>{dream.reference.source}<span class="sr-only"> (åbner i nyt vindue)</span></a
 		>.
 	</p>
 </section>
@@ -719,6 +807,94 @@
 		font-size: 10px;
 		margin-left: 2px;
 		color: var(--ink-muted);
+	}
+
+	.dream .story {
+		max-width: 72ch;
+		margin-bottom: 16px;
+	}
+
+	.dream-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(560px, 1fr));
+		column-gap: 36px;
+		row-gap: 24px;
+	}
+
+	@media (max-width: 640px) {
+		.dream-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	.dream-table {
+		min-width: 560px;
+	}
+
+	.dream-table caption {
+		color: var(--ink-secondary);
+		font-size: 12.5px;
+	}
+
+	.dream-table caption strong {
+		color: var(--ink);
+	}
+
+	.dream-table th,
+	.dream-table td {
+		padding: 5px 10px 5px 0;
+		font-size: 12.5px;
+	}
+
+	.dream-table thead th {
+		font-size: 11px;
+		color: var(--ink-muted);
+		vertical-align: bottom;
+		border-bottom-color: var(--rule-strong);
+	}
+
+	.dream-table thead th:nth-child(n + 3),
+	.dream-table td:nth-child(n + 2) {
+		text-align: right;
+	}
+
+	.dream-table tbody th {
+		color: var(--ink);
+		white-space: nowrap;
+		vertical-align: top;
+		border-bottom-color: var(--rule);
+	}
+
+	.dream-table tbody th .unit {
+		display: block;
+		font-size: 11px;
+		color: var(--ink-muted);
+	}
+
+	.dream-table tr:not(.ours) td {
+		border-bottom: 0;
+		padding-bottom: 1px;
+	}
+
+	.dream-table tr.ours td {
+		padding-top: 1px;
+	}
+
+	.dream-table td.who {
+		text-align: left;
+		font-weight: 400;
+		font-size: 11px;
+		color: var(--ink-muted);
+	}
+
+	.dream-table tr:not(.ours) td:not(.who) {
+		font-weight: 400;
+		color: var(--ink-secondary);
+	}
+
+	.dream-table td:last-child,
+	.dream-table th:last-child {
+		padding-right: 0;
 	}
 
 	.notes {

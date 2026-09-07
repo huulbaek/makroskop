@@ -64,6 +64,31 @@ export interface Multipliers {
 	rows: MultiplierRow[];
 }
 
+export interface DreamComparisonRow {
+	series: string;
+	dream: Record<string, number | null>;
+	ours: Record<string, number | null>;
+}
+
+export interface DreamComparisonShock {
+	id: string;
+	labelDa: string;
+	scenario: string;
+	scale: number;
+	scaleNoteDa: string;
+	noteDa: string | null;
+	rows: DreamComparisonRow[];
+}
+
+export interface DreamComparison {
+	generated: string;
+	shockYear: number;
+	columns: number[];
+	reference: { source: string; url: string; modelDa: string; methodDa: string };
+	series: { key: string; labelDa: string; unitDa: string }[];
+	shocks: DreamComparisonShock[];
+}
+
 export interface Validation {
 	generated: string;
 	model: { name: string; commit: string };
@@ -88,10 +113,11 @@ export interface Validation {
 export const load: PageLoad = async ({ fetch }) => {
 	const response = await fetch('/data/validation.json');
 	const validation = (await response.json()) as Validation;
-	const [baseline, scenario, multipliers] = await Promise.all([
+	const [baseline, scenario, multipliers, dreamComparison] = await Promise.all([
 		loadBaseline(fetch),
 		loadScenario(fetch, validation.scenario.id),
-		fetch('/data/multipliers.json').then((r) => r.json() as Promise<Multipliers>)
+		fetch('/data/multipliers.json').then((r) => r.json() as Promise<Multipliers>),
+		fetch('/data/dream_comparison.json').then((r) => r.json() as Promise<DreamComparison>)
 	]);
-	return { validation, years: baseline.years, scenario, multipliers };
+	return { validation, years: baseline.years, scenario, multipliers, dreamComparison };
 };
