@@ -981,15 +981,30 @@ def peak_rss_gb() -> float:
     return peak / (1024**3 if sys.platform == "darwin" else 1024**2)  # bytes on macOS, KB on Linux
 
 
+# MKL Pardiso parameters (1-based, as in the MKL docs). iparm(1)=1 makes MKL honour every value,
+# so the mtype-11 defaults are spelled out; the two that matter (measured 2026-09-09 on the
+# full-horizon reference Jacobian, etl/pardiso_probe.py, makroskop-q2r):
+#   iparm(10)=6  pivot perturbation 1e-6 instead of the default 1e-13. Static pivoting perturbs
+#                ~190 tiny pivots on this system; at 1e-13 the factorization is garbage
+#                (probe residual 4e7), at 1e-6 it is a first-rate preconditioner (4e-7).
+#   iparm(8)=10  up to ten internal refinement steps per solve -> probe 1e-16, i.e. the raw
+#                solve is as accurate as UMFPACK's. 43 s and 8 GB versus ~450 s and 28 GB.
+# Matching (13) and scaling (11) must stay on: without matching the factorization is NaN.
+PARDISO_IPARM = {1: 1, 2: 2, 4: 0, 5: 0, 6: 0, 8: 10, 10: 6, 11: 1, 13: 1, 18: -1, 19: -1, 21: 0,
+                 24: 0, 25: 0, 27: 0, 28: 0, 31: 0, 34: 0, 35: 0, 36: 0, 37: 0, 56: 0, 60: 0}
+
+
 def make_direct_solver(matrix):
     """Factorize once, return a verified solve callable.
 
     Backend chain (override order with FREESOLVER_BACKEND=umfpack,superlu,...):
-    Pardiso is fastest but its static pivoting sporadically produces garbage
-    factorizations on this ill-conditioned system (observed refinement residuals
-    up to 1e33); every factorization is therefore verified with a probe solve
-    and rejected backends fall through to UMFPACK, then SuperLU (never observed
-    to fail). Rows are equilibrated first (row scales span ~1e-2..1e5).
+    Pardiso with PARDISO_IPARM is ~10x faster and ~3x leaner than UMFPACK on the full
+    horizon, but static pivoting can still misbehave, so every factorization is verified
+    with a probe solve: accepted outright when the raw solve is accurate to 1e-8, or when
+    the refinement loop linear_solve runs anyway converges to 1e-11 within six steps
+    (a good preconditioner is all Newton needs). Rejected backends fall through to
+    UMFPACK, then SuperLU (never observed to fail). Rows are equilibrated first
+    (row scales span ~1e-2..1e5).
     """
     import os
     from scipy import sparse
@@ -1006,6 +1021,8 @@ def make_direct_solver(matrix):
         if backend == "pardiso":
             import pypardiso
             solver = pypardiso.PyPardisoSolver()
+            for index, value in PARDISO_IPARM.items():
+                solver.set_iparm(index, value)
             solver.factorize(scaled)
 
             def solve(b):
@@ -1031,20 +1048,37 @@ def make_direct_solver(matrix):
 
     probe_rhs = csr @ np.random.default_rng(3).standard_normal(n)
     probe_norm = np.linalg.norm(probe_rhs) + 1e-300
+
+    def verify(solve_fn) -> tuple[float, float]:
+        """(raw probe residual, residual after up to six refinement steps), both relative."""
+        sol = solve_fn(probe_rhs)
+        raw = np.linalg.norm(csr @ sol - probe_rhs) / probe_norm
+        refined = raw
+        for _ in range(6):
+            if refined < 1e-11:
+                break
+            sol = sol + solve_fn(probe_rhs - csr @ sol)
+            refined = np.linalg.norm(csr @ sol - probe_rhs) / probe_norm
+        return raw, refined
+
     order = os.environ.get("FREESOLVER_BACKEND", "pardiso,umfpack,superlu").split(",")
     for backend in order:
         backend = backend.strip()
         if backend == "pardiso" and _PARDISO_REJECTIONS[0] >= 3:
-            continue  # proven useless on this system; skip the 40s + memory spike
+            continue  # three rejections in a row: skip the 40 s + memory spike for the rest of the run
         try:
             solve_fn = build(backend)
         except ImportError:
             continue
-        rel = np.linalg.norm(csr @ solve_fn(probe_rhs) - probe_rhs) / probe_norm
-        if rel < 1e-8:
+        rel, refined = verify(solve_fn)
+        if rel < 1e-8 or refined < 1e-11:
+            if rel >= 1e-8:
+                print(f"  {backend}: accepted after refinement (probe {rel:.1e} -> {refined:.1e})", flush=True)
+            if backend == "pardiso":
+                _PARDISO_REJECTIONS[0] = 0
             return solve_fn
-        print(f"  {backend}: factorization rejected (probe rel residual {rel:.1e}), "
-              f"falling back", flush=True)
+        print(f"  {backend}: factorization rejected (probe rel residual {rel:.1e}, "
+              f"refined {refined:.1e}), falling back", flush=True)
         if backend == "pardiso":
             _PARDISO_REJECTIONS[0] += 1
         # free the rejected factorization BEFORE building the next backend —

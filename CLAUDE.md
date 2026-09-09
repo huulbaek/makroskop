@@ -84,9 +84,16 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
   handles this automatically when `_reference.gdx` exists.
 - Full-horizon (2.2M eq) direct factorization needs ~64GB → rented x86 Ubuntu box
   (see `cloud/README.md`). A 16GB laptop manages ≤ ~12-year windows.
-- Linear solvers: verified backend chain in `make_direct_solver` (Pardiso probe-tested,
-  falls back to UMFPACK/kvxopt — the reliable workhorse — then SuperLU). Never trust an
-  unverified Pardiso factorization. Rows are equilibrated; refinement runs to 1e-11.
+- Linear solvers: verified backend chain in `make_direct_solver` — MKL Pardiso with
+  `PARDISO_IPARM` first, UMFPACK/kvxopt as the fallback, then SuperLU. Pardiso's static pivoting
+  perturbs ~190 tiny pivots on the full-horizon Jacobian; at MKL's default perturbation 1e-13
+  the factorization is garbage (that was every rejection in batches 2-4), at `iparm(10)=6`
+  (1e-6) plus `iparm(8)=10` internal refinement it passes the probe at 1e-16 (makroskop-q2r,
+  `etl/pardiso_probe.py`, 2026-09-09). pypardiso ignores `set_iparm` unless `iparm(1)=1` and the
+  whole set is given. Every factorization is still probe-verified; one whose refinement converges
+  to 1e-11 within six steps is accepted too. Full horizon: 44 s and ~9 GB per factorization
+  against UMFPACK's ~450 s and 28 GB; Bundskat_ufin solves in 4 min 41 s instead of ~40, with the
+  same solution to 2e-12 (`etl/compare_gdx.py`). Rows are equilibrated; refinement runs to 1e-11.
 - Newton needs non-monotone acceptance (NPV variables legitimately spike the residual
   on full steps) + adaptive shock-size continuation with per-stage disk checkpoints.
   The spike allowance (1000× start residual) is a coin flip on the full horizon —
@@ -106,11 +113,11 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
   j-terms (`POLE_JTERMS`) — exact for all other variables since the j-terms appear nowhere
   else; frozen j-terms export at reference values. Diagnose future stalls the same way: read
   the `worst residual (...)` lines before touching the solver.
-- KEEP `pardiso` FIRST in the backend chain even though its factorizations get rejected:
-  importing pypardiso loads MKL, and UMFPACK's BLAS then runs on MKL (parallel,
-  `openmp_worker` threads). kvxopt's bundled OpenBLAS is a serial build, so
-  `FREESOLVER_BACKEND=umfpack,...` makes full-horizon factorizations 4–5× slower
-  (1400–2700 s vs 330–680 s on the same box). Don't set OPENBLAS/OMP_NUM_THREADS either.
+- KEEP `pardiso` FIRST in the backend chain: besides being the fast path, importing pypardiso
+  loads MKL, and UMFPACK's BLAS then runs on MKL (parallel, `openmp_worker` threads) whenever the
+  fallback is needed. kvxopt's bundled OpenBLAS is a serial build, so `FREESOLVER_BACKEND=umfpack,...`
+  makes full-horizon UMFPACK factorizations 4–5× slower (1400–2700 s vs 330–680 s on the same
+  box). Don't set OPENBLAS/OMP_NUM_THREADS either.
 - Long box runs: launch batch scripts with `setsid nohup`; a dead parent shell silently
   ends the batch after the current scenario. `cloud/relaunch_after_stage.sh` restarts a
   batch at the next checkpoint (e.g. after pushing a new freesolver.py) without losing work.
