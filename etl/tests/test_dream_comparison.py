@@ -31,6 +31,13 @@ def test_row_values_never_emits_negative_zero() -> None:
     assert str(row["ours"]["2030"]) == "0.0"
 
 
+def test_size_note_prefers_an_exact_run_over_scaling() -> None:
+    assert dc.size_note(11.785, exact=True) == (1.0, "Løst i DREAMs stødstørrelse (1 pct. af BNP), ingen opskalering.")
+    assert dc.size_note(1.0, exact=False)[0] == 1.0
+    scale, note = dc.size_note(11.785, exact=False)
+    assert scale == 11.785 and "11,79 ×" in note
+
+
 def test_unknown_series_is_an_error() -> None:
     try:
         dc.convert("pBolig", 1.0, 1.0, REF)

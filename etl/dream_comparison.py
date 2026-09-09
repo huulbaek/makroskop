@@ -79,6 +79,24 @@ def row_values(key: str, readings: dict[str, float], ours: list[float | None], y
     return {"series": key, "dream": dream, "ours": scaled}
 
 
+def size_note(scale: float, exact: bool) -> tuple[float, str]:
+    """(factor applied to our deviations, Danish caption) — 1.0 when the run itself has DREAM's size."""
+    if exact:
+        return 1.0, "Løst i DREAMs stødstørrelse (1 pct. af BNP), ingen opskalering."
+    if abs(scale - 1.0) < 1e-9:
+        return 1.0, "Samme stødstørrelse i begge modeller."
+    scale_da = f"{scale:.2f}".replace(".", ",")
+    return scale, (f"DREAMs stød er 1 pct. af BNP, svarende til {scale_da} × MAKROskops stød; "
+                   f"MAKROskops tal er skaleret lineært op med den faktor.")
+
+
+def dream_size_deviations(gdx_path: Path, reference_gdx: Path) -> dict[str, list[float | None]]:
+    """Pct. deviations of a run solved at DREAM's shock size, via extract.py's own machinery."""
+    from extract import extract_detrended, extract_shock, open_gdx
+
+    return extract_shock(gdx_path, extract_detrended(open_gdx(reference_gdx)))["deviations"]
+
+
 def reference_levels(reference_gdx: Path) -> RefLevels:
     from multipliers import series
     import gams.transfer as gt
@@ -99,6 +117,8 @@ def main() -> None:
     parser.add_argument("--readings", type=Path, default=here / "dream_may2025.json")
     parser.add_argument("--shocks-dir", type=Path, default=here / "shock_gdx")
     parser.add_argument("--json-dir", type=Path, default=here.parent / "app" / "static" / "data")
+    parser.add_argument("--dream-size-dir", type=Path, default=here / "shock_gdx_dreamsize",
+                        help="runs solved at DREAM's 1-pct-of-GDP size (cloud/run_extra_2030.sh); used instead of scaling")
     parser.add_argument("--out", type=Path, default=here.parent / "app" / "static" / "data" / "dream_comparison.json")
     args = parser.parse_args()
 
@@ -118,15 +138,15 @@ def main() -> None:
             print(f"{scenario}: missing, skipped")
             continue
         deviations = json.loads(path.read_text(encoding="utf-8"))["deviations"]
-        scale = float(readings["dreamShockOverOurs"][shock_id])
+        exact_path = args.dream_size_dir / f"{shock_id}.gdx"
+        exact = exact_path.exists()
+        if exact:
+            deviations = dream_size_deviations(exact_path, args.shocks_dir / "_reference.gdx")
+        scale, scale_note = size_note(float(readings["dreamShockOverOurs"][shock_id]), exact)
         rows = [row_values(key, readings["readings"][shock_id].get(READING_KEY.get(key, key), {}),
                            deviations[key], years, scale, ref, COLUMNS)
                 for key, _, _ in SERIES if READING_KEY.get(key, key) in readings["readings"][shock_id]]
-        scale_da = f"{scale:.2f}".replace(".", ",")
-        scale_note = ("Samme stødstørrelse i begge modeller." if abs(scale - 1.0) < 1e-9 else
-                      f"DREAMs stød er 1 pct. af BNP, svarende til {scale_da} × MAKROskops stød; "
-                      f"MAKROskops tal er skaleret lineært op med den faktor.")
-        shocks.append({"id": shock_id, "labelDa": labels[shock_id], "scenario": scenario,
+        shocks.append({"id": shock_id, "labelDa": labels[shock_id], "scenario": scenario, "solvedAtDreamSize": exact,
                        "scale": round(scale, 3), "scaleNoteDa": scale_note, "noteDa": note, "rows": rows})
         first = rows[0]
         print(f"{labels[shock_id]:32s} x{scale:5.2f}  {first['series']} 2030: DREAM {first['dream']['2030']}  ours {first['ours']['2030']}")
