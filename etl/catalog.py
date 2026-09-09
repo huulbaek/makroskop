@@ -87,6 +87,19 @@ RATIOS = [
     ("nettoformue2bnp", "vOff13Net", "vBNP", "Offentlig nettoformue, andel af BNP", "Public net worth, share of GDP", "Offentlige finanser", "pct. af BNP"),
 ]
 
+# Growth-rate series computed in the ETL from the re-trended levels of the series above, the way
+# DREAM's own report template does it ("Inflation (pBVT)" = pBVT / lag(pBVT) * fp - 1 in
+# Analysis/Templates/variables_to_plot.py). Baseline levels are pct. per year; shock deviations are
+# pct.-point differences in the growth rate. DREAM's review (2026-09-09) asked for these instead of
+# the index levels under "Priser og løn"; the level series stay for the scenario pages.
+# (key, source_key, label_da, label_en, group, unit)
+GROWTH = [
+    ("pC_vaekst", "pC", "Inflation (forbrugerpriser)", "Consumer price inflation", "Priser og løn", "pct. p.a."),
+    ("pBVT_vaekst", "pBVT", "BVT-deflator, vækst", "GVA deflator growth", "Priser og løn", "pct. p.a."),
+    ("pBolig_vaekst", "pBolig", "Boligpriser, vækst", "House price growth", "Priser og løn", "pct. p.a."),
+    ("vhW_vaekst", "vhW", "Lønstigning (DA-området)", "Hourly wage growth (DA)", "Priser og løn", "pct. p.a."),
+]
+
 
 # Display scaling applied to baseline levels (not deviations): rates -> pct., wages -> kr.
 DISPLAY_SCALE = {"rRenteObl": 100, "rRenteECB": 100, "tLukning": 100, "vhW": 1000}
@@ -117,6 +130,7 @@ SHOCKS: list[ShockDef] = [
     ShockDef("Selskabsskat", "Selskabsskat", "Corporate income tax", "Skatter og afgifter"),
     ShockDef("Aktieskat", "Aktieskat", "Dividend/capital gains tax", "Skatter og afgifter"),
     ShockDef("Moms", "Moms", "VAT", "Skatter og afgifter"),
+    ShockDef("Moms_ned", "Momsnedsættelse", "VAT cut", "Skatter og afgifter"),
     ShockDef("Registreringsafgift", "Registreringsafgift", "Vehicle registration tax", "Skatter og afgifter"),
     ShockDef("Energiafgift", "Energiafgift", "Household energy taxes", "Skatter og afgifter"),
     ShockDef("Forbrugsafgift", "Øvrige forbrugsafgifter", "Other consumption taxes", "Skatter og afgifter"),
@@ -284,6 +298,11 @@ SHOCK_RUNS: list[ShockRun] = [
     ShockRun("Aktieskat", "tAktieTop", "Aktieindkomstskat, topsats", 1.0, 0.01, "+1 pct.-point", 2030,
              "DREAM ændrer både top- og lavsatsen normeret til 1 pct. af BNP; i denne konfiguration er kun topsatsen en variabel.",
              explainer_da="En højere topsats på aktieindkomst har næsten ingen realøkonomisk virkning i MAKRO; provenuet forbedrer saldoen marginalt, og forbruget falder først på langt sigt."),
+    ShockRun("Moms_ned", "tMoms_y,tMoms_m", "Momssatser (indenlandsk og importeret)", 1.0, -0.005, "−0,5 pct.-point", 2030,
+             _DREAM_GDP_NORM + " Nedsættelsen er løst som sit eget scenarie i stedet for at spejle forhøjelsen: "
+             "nedad findes ingen modelgrænse, så skalaen er fri.",
+             explainer_da="Lavere moms sænker forbrugerpriserne og hæver realindkomsten: forbruget stiger, boligpriserne "
+                          "stiger, og BNP løftes svagt, mens saldoen svækkes med det tabte provenu."),
     ShockRun("Moms", "tMoms_y,tMoms_m", "Momssatser (indenlandsk og importeret)", 1.0, 0.005, "+0,5 pct.-point", 2030,
              _DREAM_GDP_NORM + " Stødet er halveret i forhold til de øvrige satsstød: ved ca. 0,9 pct.-point rammer "
              "de 18-åriges ejerboligbeholdning omkring 2110 nul, og modellen har ingen håndtering af den grænse.",
