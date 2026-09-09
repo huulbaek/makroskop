@@ -18,8 +18,12 @@
 	const groups = ['Nationalregnskab', 'Arbejdsmarked', 'Priser og løn', 'Offentlige finanser', 'Renter', 'Brancher'];
 	let activeGroup = $state('Nationalregnskab');
 
+	/** Not browsed here (DREAM's review, Sep 2026): nominal GDP gives way to real GDP under
+	 *  Nationalregnskab, and the price/wage index levels to their growth rates under Priser og løn.
+	 *  The level series stay in the catalog for the scenario pages. */
+	const hiddenInGrid = new Set(['vBNP', 'pC', 'pBVT', 'pBolig', 'vhW']);
 	const groupSeries = $derived(
-		meta.series.filter((s) => s.group === activeGroup && s.key in baseline.series && s.key !== 'qBNP')
+		meta.series.filter((s) => s.group === activeGroup && s.key in baseline.series && !hiddenInGrid.has(s.key))
 	);
 
 	/** 4 columns for 8/12/16 charts, 3 for 6/9/18; otherwise whichever leaves fewer empty slots. */

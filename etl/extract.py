@@ -26,7 +26,7 @@ import gams.transfer as gt
 import gamspy_base
 
 from catalog import (
-    DISPLAY_SCALE, RATIOS, SECTOR_SERIES_TEMPLATES, SECTORS, SERIES, SHOCKS, VARIATIONS, SeriesDef,
+    DISPLAY_SCALE, GROWTH, RATIOS, SECTOR_SERIES_TEMPLATES, SECTORS, SERIES, SHOCKS, VARIATIONS, SeriesDef,
     shock_definition,
 )
 
@@ -104,8 +104,45 @@ def all_series_defs() -> list[SeriesDef]:
     return defs
 
 
-def extract_detrended(container: gt.Container, warn: bool = False) -> dict[str, dict[int, float]]:
-    """Detrended series + ratios, enough for shock-deviation comparisons."""
+def growth_rates(levels: dict[int, float]) -> dict[int, float]:
+    """Year-on-year growth as a fraction, x_t / x_{t-1} - 1, for the years with a non-zero predecessor."""
+    return {
+        year: value / levels[year - 1] - 1
+        for year, value in levels.items()
+        if year - 1 in levels and levels[year - 1] != 0
+    }
+
+
+# Derived series (ratios and growth rates) are fractions here; the app columns and the pp
+# deviations multiply by 100.
+DERIVED_KEYS = [key for key, *_ in RATIOS] + [key for key, *_ in GROWTH]
+
+
+def add_derived(detrended: dict[str, dict[int, float]], factors: dict[str, dict[int, float]] | None) -> None:
+    """Append the RATIOS and GROWTH series to a dict of detrended model series, in place.
+
+    Growth rates are taken on the re-trended level (detrended value x fvt/fqt/fpt), so they include
+    the model's trend inflation/growth; `factors` are the baseline's, which is exact because the
+    trend factors are exogenous data shared by every scenario. Without factors (callers that only
+    need the model series and ratios) the growth series are skipped.
+    """
+    trend_of = {sdef.key: sdef.trend for sdef in all_series_defs()}
+    for key, numerator, denominator, *_ in RATIOS:
+        if numerator in detrended and denominator in detrended:
+            detrended[key] = {
+                year: detrended[numerator][year] / detrended[denominator][year]
+                for year in detrended[numerator]
+                if year in detrended[denominator]
+            }
+    for key, source, *_ in GROWTH:
+        if factors is not None and source in detrended:
+            detrended[key] = growth_rates(apply_trend(detrended[source], trend_of[source], factors))
+
+
+def extract_detrended(
+    container: gt.Container, factors: dict[str, dict[int, float]] | None = None, warn: bool = False
+) -> dict[str, dict[int, float]]:
+    """Detrended series + derived ratios/growth rates, enough for shock-deviation comparisons."""
     detrended: dict[str, dict[int, float]] = {}
     for sdef in all_series_defs():
         values = read_records(container, sdef)
@@ -114,29 +151,22 @@ def extract_detrended(container: gt.Container, warn: bool = False) -> dict[str, 
                 print(f"  WARNING: no data for {sdef.key} ({sdef.gdx_name}{list(sdef.selector)})")
             continue
         detrended[sdef.key] = values
-    for key, numerator, denominator, *_ in RATIOS:
-        if numerator in detrended and denominator in detrended:
-            detrended[key] = {
-                year: detrended[numerator][year] / detrended[denominator][year]
-                for year in detrended[numerator]
-                if year in detrended[denominator]
-            }
+    add_derived(detrended, factors)
     return detrended
 
 
 def extract_baseline(container: gt.Container) -> tuple[dict[str, dict[int, float]], dict[str, list[float | None]]]:
     """Returns (detrended series for shock comparisons, actual-level columns for the app)."""
     factors = read_trend_factors(container)
-    detrended = extract_detrended(container, warn=True)
+    detrended = extract_detrended(container, factors, warn=True)
     columns: dict[str, list[float | None]] = {}
-    ratio_keys = {key for key, *_ in RATIOS}
     for sdef in all_series_defs():
         if sdef.key not in detrended:
             continue
         scale = DISPLAY_SCALE.get(sdef.key, 1)
         actual = apply_trend(detrended[sdef.key], sdef.trend, factors)
         columns[sdef.key] = to_column({year: value * scale for year, value in actual.items()})
-    for key in ratio_keys:
+    for key in DERIVED_KEYS:
         if key in detrended:
             columns[key] = to_column({year: value * 100 for year, value in detrended[key].items()})
     return detrended, columns
@@ -151,7 +181,9 @@ def read_hbi(container: gt.Container) -> float | None:
     return sig_round(float(records.iloc[0]["level"]))
 
 
-def extract_shock(gdx_path: Path, baseline_detrended: dict[str, dict[int, float]]) -> dict:
+def extract_shock(
+    gdx_path: Path, baseline_detrended: dict[str, dict[int, float]], factors: dict[str, dict[int, float]] | None = None
+) -> dict:
     """Compute deviation-from-baseline columns for one solved shock GDX."""
     container = open_gdx(gdx_path)
     solver_meta = read_solver_meta(container)
@@ -170,16 +202,12 @@ def extract_shock(gdx_path: Path, baseline_detrended: dict[str, dict[int, float]
         else:  # "pp" and "gdp_pp" handled below via ratios; raw pp here
             dev = {y: (v - base[y]) * 100 for y, v in values.items() if y in base}
         deviations[sdef.key] = to_column(dev)
-    for key, numerator, denominator, *_ in RATIOS:
-        if numerator in shock_detrended and denominator in shock_detrended and key in baseline_detrended:
-            shock_ratio = {
-                year: shock_detrended[numerator][year] / shock_detrended[denominator][year]
-                for year in shock_detrended[numerator]
-                if year in shock_detrended[denominator]
-            }
-            base_ratio = baseline_detrended[key]
+    add_derived(shock_detrended, factors)
+    for key in DERIVED_KEYS:  # ratios and growth rates: pct.-point differences
+        if key in shock_detrended and key in baseline_detrended:
+            base = baseline_detrended[key]
             deviations[key] = to_column({
-                year: (value - base_ratio[year]) * 100 for year, value in shock_ratio.items() if year in base_ratio
+                year: (value - base[year]) * 100 for year, value in shock_detrended[key].items() if year in base
             })
     return {"deviations": deviations, "hbi": read_hbi(container), "solverMeta": solver_meta}
 
@@ -254,6 +282,10 @@ def build_meta(container: gt.Container, makro_root: Path, available_shocks: dict
     series_meta += [
         {"key": key, "labelDa": label_da, "labelEn": label_en, "group": group, "unit": unit, "devMode": "pp", "sector": None}
         for key, _, _, label_da, label_en, group, unit in RATIOS
+    ]
+    series_meta += [
+        {"key": key, "labelDa": label_da, "labelEn": label_en, "group": group, "unit": unit, "devMode": "pp", "sector": None}
+        for key, _, label_da, label_en, group, unit in GROWTH
     ]
     return {
         "model": model_version(makro_root),
@@ -333,6 +365,7 @@ def main() -> None:
 
     print("Reading baseline.gdx ...")
     baseline = open_gdx(args.makro_root / "Model/Gdx/baseline.gdx")
+    factors = read_trend_factors(baseline)
     detrended, columns = extract_baseline(baseline)
 
     # Solver-produced shock GDXs must be compared against the solver's own unshocked
@@ -340,7 +373,7 @@ def main() -> None:
     reference_path = args.shocks_dir / "_reference.gdx"
     if reference_path.exists():
         print("Reading solver reference (_reference.gdx) for shock comparisons ...")
-        shock_reference = extract_detrended(open_gdx(reference_path))
+        shock_reference = extract_detrended(open_gdx(reference_path), factors)
     else:
         shock_reference = detrended
     (args.out / "baseline.json").write_text(
@@ -357,7 +390,7 @@ def main() -> None:
             print(f"Reading shock {gdx_path.name} ...")
             payload = {"shock": shock_name, "variation": suffix, "synthetic": False,
                        "definition": shock_definition(shock_name, suffix, MODEL_HORIZON_END),
-                       **extract_shock(gdx_path, shock_reference)}
+                       **extract_shock(gdx_path, shock_reference, factors)}
             payload["modelVersion"] = scenario_model_version(payload.pop("solverMeta"), current_version)
             if payload["modelVersion"]["source"] == "assumed":
                 print(f"  note: {gdx_path.name} carries no solver stamp; assuming {current_version['name']}")
