@@ -256,7 +256,7 @@
 	const query = $derived(packageQuery(components, variant));
 	const shareUrl = $derived(components.length > 0 ? packagePermalink(page.url.origin, query) : '');
 	const provenance = $derived(
-		provenanceLine({ model: meta.model.name, commit: meta.model.commit ?? '', closure: closureLabel, date: __BUILD_DATE__ })
+		provenanceLine({ model: meta.model.name, commit: meta.model.commit ?? '', dataBasis: meta.model.dataBasisDa, closure: closureLabel, date: __BUILD_DATE__ })
 	);
 	const packageDescription = $derived(
 		packageLine(

@@ -23,6 +23,19 @@ describe('provenanceLine', () => {
 			provenanceLine({ model: 'MAKRO 2026-June', commit: '01f2a43', closure: 'Permanent, ufinansieret', date: '2026-08-28' })
 		).toBe('MAKROskop · makroskop.nodalit.com · MAKRO 2026-June (01f2a43) · permanent, ufinansieret · 2026-08-28');
 	});
+	it('cites the data basis next to the model version when known', () => {
+		expect(
+			provenanceLine({
+				model: 'MAKRO 2026-June',
+				commit: '01f2a43',
+				dataBasis: 'Nationalregnskabsdata fra marts 2026',
+				closure: 'Permanent, ufinansieret',
+				date: '2026-08-28'
+			})
+		).toBe(
+			'MAKROskop · makroskop.nodalit.com · MAKRO 2026-June (01f2a43), Nationalregnskabsdata fra marts 2026 · permanent, ufinansieret · 2026-08-28'
+		);
+	});
 	it('drops an empty commit', () => {
 		expect(provenanceLine({ model: 'MAKRO 2026-June', commit: '', closure: 'X', date: '2026-08-28' })).toContain(
 			'· MAKRO 2026-June · x ·'

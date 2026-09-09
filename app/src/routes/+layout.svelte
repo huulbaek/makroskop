@@ -118,6 +118,10 @@
 		<dl class="stamp">
 			<dt>Model</dt>
 			<dd class="mono">{data.meta.model.name} {data.meta.model.commit}</dd>
+			{#if data.meta.model.dataBasisDa}
+				<dt>Datagrundlag</dt>
+				<dd class="mono">{data.meta.model.dataBasisDa}</dd>
+			{/if}
 			<dt>Sidste dataår</dt>
 			<dd class="mono">{data.meta.lastDataYear}</dd>
 			<dt>MAKROskop</dt>

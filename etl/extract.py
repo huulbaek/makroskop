@@ -184,14 +184,21 @@ def extract_shock(gdx_path: Path, baseline_detrended: dict[str, dict[int, float]
     return {"deviations": deviations, "hbi": read_hbi(container), "solverMeta": solver_meta}
 
 
+# Data vintage per MAKRO release, as DREAM asks results to be cited ("MAKRO 26-juni baseret på
+# Nationalregnskabsdata fra marts 2026", Martin Bonde, 2026-09-09). Not derivable from the repo,
+# so it is keyed on the README's version line; an unknown release gets no data-basis line.
+DATA_BASIS_DA = {"MAKRO 2026-June": "Nationalregnskabsdata fra marts 2026"}
+
+
 def model_version(makro_root: Path) -> dict[str, str]:
     readme_first_line = (makro_root / "README.md").read_text(encoding="utf-8").splitlines()[0]
     commit = subprocess.run(
         ["git", "-C", str(makro_root), "rev-parse", "--short", "HEAD"],
         capture_output=True, text=True, check=False,
     ).stdout.strip()
-    return {"name": readme_first_line.lstrip("# ").strip(), "commit": commit,
-            "fingerprint": model_fingerprint(makro_root)}
+    name = readme_first_line.lstrip("# ").strip()
+    return {"name": name, "commit": commit, "fingerprint": model_fingerprint(makro_root),
+            "dataBasisDa": DATA_BASIS_DA.get(name, "")}
 
 
 def model_fingerprint(makro_root: Path) -> str:

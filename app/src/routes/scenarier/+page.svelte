@@ -161,6 +161,8 @@
 		provenanceLine({
 			model: scenario?.modelVersion?.name ?? meta.model.name,
 			commit: scenario?.modelVersion?.commit ?? meta.model.commit ?? '',
+			// the data vintage is only known for the site's own model version
+			dataBasis: !scenario?.modelVersion || scenario.modelVersion.name === meta.model.name ? meta.model.dataBasisDa : undefined,
 			closure: closureLabel,
 			date: __BUILD_DATE__
 		})

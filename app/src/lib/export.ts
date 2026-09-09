@@ -22,13 +22,16 @@ export function permalink(origin: string, p: PermalinkParams): string {
 export interface Provenance {
 	model: string;
 	commit: string;
+	/** Data vintage behind the model version, e.g. "Nationalregnskabsdata fra marts 2026". */
+	dataBasis?: string;
 	closure: string;
 	date: string;
 }
 
 /** One-line source stamp that travels with every export and screenshot. */
 export function provenanceLine(p: Provenance): string {
-	const model = p.commit ? `${p.model} (${p.commit})` : p.model;
+	const version = p.commit ? `${p.model} (${p.commit})` : p.model;
+	const model = p.dataBasis ? `${version}, ${p.dataBasis}` : version;
 	return ['MAKROskop', SITE_HOST, model, p.closure.toLowerCase(), p.date].join(' · ');
 }
 

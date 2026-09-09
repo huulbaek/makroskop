@@ -24,7 +24,7 @@ export interface VariationMeta {
 }
 
 export interface Meta {
-	model: { name: string; commit: string; fingerprint?: string };
+	model: { name: string; commit: string; fingerprint?: string; dataBasisDa?: string };
 	yearStart: number;
 	yearEnd: number;
 	lastDataYear: number;
