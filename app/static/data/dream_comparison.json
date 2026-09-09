@@ -49,9 +49,9 @@
    "id": "Eksportmarkedsvaekst",
    "labelDa": "Eksportmarkedsvækst",
    "scenario": "Eksportmarkedsvaekst_ufin",
-   "solvedAtDreamSize": false,
-   "scale": 1.261,
-   "scaleNoteDa": "DREAMs stød er 1 pct. af BNP, svarende til 1,26 × MAKROskops stød; MAKROskops tal er skaleret lineært op med den faktor.",
+   "solvedAtDreamSize": true,
+   "scale": 1.0,
+   "scaleNoteDa": "Løst i DREAMs stødstørrelse (1 pct. af BNP), ingen opskalering.",
    "noteDa": null,
    "rows": [
     {
@@ -67,12 +67,12 @@
       "2080": null
      },
      "ours": {
-      "2030": 2.82,
-      "2031": 2.76,
-      "2032": 1.44,
-      "2033": 0.4,
+      "2030": 2.81,
+      "2031": 2.74,
+      "2032": 1.43,
+      "2033": 0.39,
       "2035": -0.32,
-      "2040": -0.1,
+      "2040": -0.09,
       "2050": 0.0,
       "2080": 0.0
      }
@@ -152,9 +152,9 @@
    "id": "Offentlig_varekoeb",
    "labelDa": "Offentlige varekøb",
    "scenario": "Offentlig_varekoeb_ufin",
-   "solvedAtDreamSize": false,
-   "scale": 11.785,
-   "scaleNoteDa": "DREAMs stød er 1 pct. af BNP, svarende til 11,79 × MAKROskops stød; MAKROskops tal er skaleret lineært op med den faktor.",
+   "solvedAtDreamSize": true,
+   "scale": 1.0,
+   "scaleNoteDa": "Løst i DREAMs stødstørrelse (1 pct. af BNP), ingen opskalering.",
    "noteDa": null,
    "rows": [
     {
@@ -170,11 +170,11 @@
       "2080": null
      },
      "ours": {
-      "2030": 3.99,
-      "2031": 3.54,
-      "2032": 1.67,
-      "2033": 0.39,
-      "2035": -0.39,
+      "2030": 3.86,
+      "2031": 3.41,
+      "2032": 1.62,
+      "2033": 0.37,
+      "2035": -0.4,
       "2040": -0.13,
       "2050": 0.01,
       "2080": 0.01
@@ -262,12 +262,12 @@
       "2080": null
      },
      "ours": {
-      "2030": 0.41,
-      "2031": 0.76,
-      "2032": 0.92,
-      "2033": 0.93,
-      "2035": 0.77,
-      "2040": 0.45,
+      "2030": 0.42,
+      "2031": 0.77,
+      "2032": 0.93,
+      "2033": 0.94,
+      "2035": 0.78,
+      "2040": 0.46,
       "2050": 0.41,
       "2080": 0.41
      }
@@ -278,9 +278,9 @@
    "id": "Offentlig_Beskaeftigelse",
    "labelDa": "Offentlig beskæftigelse",
    "scenario": "Offentlig_Beskaeftigelse_ufin",
-   "solvedAtDreamSize": false,
-   "scale": 6.553,
-   "scaleNoteDa": "DREAMs stød er 1 pct. af BNP, svarende til 6,55 × MAKROskops stød; MAKROskops tal er skaleret lineært op med den faktor.",
+   "solvedAtDreamSize": true,
+   "scale": 1.0,
+   "scaleNoteDa": "Løst i DREAMs stødstørrelse (1 pct. af BNP), ingen opskalering.",
    "noteDa": "DREAM endogeniserer offentligt forbrug og holder materialekøb fast i dette stød; MAKROskop hæver kun timerne.",
    "rows": [
     {
@@ -296,12 +296,12 @@
       "2080": null
      },
      "ours": {
-      "2030": 21.89,
-      "2031": 7.15,
-      "2032": 2.75,
-      "2033": 0.98,
-      "2035": -0.67,
-      "2040": -0.38,
+      "2030": 19.78,
+      "2031": 6.19,
+      "2032": 2.57,
+      "2033": 0.99,
+      "2035": -0.68,
+      "2040": -0.39,
       "2050": -0.01,
       "2080": 0.01
      }
@@ -319,14 +319,14 @@
       "2080": null
      },
      "ours": {
-      "2030": 0.92,
-      "2031": 1.7,
-      "2032": 2.1,
-      "2033": 2.19,
-      "2035": 1.86,
-      "2040": 1.03,
-      "2050": 0.73,
-      "2080": 0.69
+      "2030": 0.95,
+      "2031": 1.76,
+      "2032": 2.17,
+      "2033": 2.26,
+      "2035": 1.92,
+      "2040": 1.06,
+      "2050": 0.75,
+      "2080": 0.72
      }
     }
    ]

@@ -106,6 +106,7 @@
 	}
 
 	const dream = $derived(data.dreamComparison);
+	const meta = $derived(data.meta);
 
 	/** Series label and DREAM unit for a comparison row. */
 	function dreamSeries(key: string): { labelDa: string; unitDa: string } {
@@ -408,8 +409,8 @@
 		{dream.shockYear}. Her står de aflæste værdier ved siden af MAKROskops egne, ufinansierede
 		scenarier omregnet til DREAMs enheder: beskæftigelse i 1.000 personer, eksport og privat
 		forbrug i pct.-point af BNP, BNP og timeløn i pct. Hvor DREAM normaliserer stødet til 1 pct.
-		af BNP, er MAKROskops tal skaleret lineært op til samme størrelse. {dream.shockYear} er
-		stødåret (år 1).
+		af BNP, er MAKROskops scenarie løst i netop den størrelse. {dream.shockYear} er stødåret
+		(år 1).
 	</p>
 	<div class="dream-grid">
 		{#each dream.shocks as shock (shock.id)}
@@ -456,11 +457,12 @@
 	</div>
 	<p class="footnote">
 		<strong>Forbehold.</strong> DREAMs tal er {dream.reference.methodDa}, og notatet bygger på
-		{dream.reference.modelDa}, mens MAKROskop regner på juni 2026-versionen. Den lineære
-		opskalering er en tilnærmelse: MAKRO er tæt på lineær for små stød, men for de offentlige
-		varekøb (faktor 11,8) og den offentlige beskæftigelse (faktor 6,6) er den grov. Forskelle på
-		10–40 pct. bør derfor ikke overfortolkes; systematiske forskelle i forløbet over tid — fx hvor
-		hurtigt beskæftigelsen vender tilbage — er mere sigende.
+		{dream.reference.modelDa}, mens MAKROskop regner på {meta.model.name}
+		({meta.model.dataBasisDa}). Stødstørrelsen er ikke en fejlkilde: de tre stød, DREAM normerer
+		til 1 pct. af BNP, er løst i netop den størrelse, og en lineær opskalering af katalogets
+		1-pct.-stød afveg højst 3 pct. (varekøb) og 10 pct. (offentlig beskæftigelse) fra de fuldt
+		løste. Forskelle på 10–20 pct. bør derfor ikke overfortolkes; systematiske forskelle i forløbet
+		over tid — fx hvor hurtigt beskæftigelsen vender tilbage — er mere sigende.
 	</p>
 	<p class="footnote">
 		Kilde:

@@ -35,3 +35,4 @@ etl/*.log
 
 # beads audit log (append-only interaction log, local-only)
 .beads/interactions.jsonl
+etl/shock_gdx_dreamsize/*.gdx
