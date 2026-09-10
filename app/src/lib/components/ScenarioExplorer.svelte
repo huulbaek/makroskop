@@ -8,7 +8,7 @@
 	import { page } from '$app/state';
 	import { replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import {
 		downloadBlob, exportFilename, permalink, provenanceLine, scenarioCsv, svgToPngBlob
 	} from '$lib/export';
@@ -36,12 +36,14 @@
 	};
 
 	/** Prerendered view pages seed from `initial`, so the built HTML shows the right shock,
-	 *  variant, scale and loading state before hydration — not the demo/pending markup. */
-	let selectedName = $state(initial?.name ?? '_demo');
-	let selectedVariation = $state(initial?.variation ?? '');
+	 *  variant, scale and loading state before hydration — not the demo/pending markup.
+	 *  Seeded once from the prerendered view (untrack: the initial value is the point; later
+	 *  changes come through select()). */
+	let selectedName = $state(untrack(() => initial?.name ?? '_demo'));
+	let selectedVariation = $state(untrack(() => initial?.variation ?? ''));
 	const daScale = new Intl.NumberFormat('da-DK', { maximumFractionDigits: 2 });
 	let override: Scenario | null | 'unset' = $state.raw('unset');
-	let loading = $state(!!initial);
+	let loading = $state(untrack(() => !!initial));
 	/** Baseline nL/vBNP by year (persons tile), fetched once after mount. */
 	let levelsByYear: Record<number, { nL: number | null; vBNP: number | null }> = $state.raw({});
 	const scenario = $derived(override === 'unset' ? initialScenario : override);
@@ -52,7 +54,9 @@
 	 *  side of the baseline — no worse than the ×2 we already allow, but it is labelled. */
 	const UNSCALED = 1;
 	const scaleSteps = $derived(stepsFor(scenario?.definition?.maxScale));
-	let scaleIdx = $state(ALL_SCALE_STEPS.indexOf(initial?.scale ?? UNSCALED));
+	// Seeded once from the prerendered view (untrack: the initial value is the point; later
+	// changes come through select()).
+	let scaleIdx = $state(untrack(() => ALL_SCALE_STEPS.indexOf(initial?.scale ?? UNSCALED)));
 	/** scaleIdx indexes scaleSteps, which shrinks when a scenario carries a cap. */
 	const boundedIdx = $derived(
 		scaleIdx >= 0 && scaleIdx < scaleSteps.length ? scaleIdx : scaleSteps.indexOf(UNSCALED)
