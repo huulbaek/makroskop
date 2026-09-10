@@ -1,6 +1,8 @@
 /** Sharing helpers for the scenario page: permalinks, provenance stamps, CSV and PNG export.
  *  The pure functions are unit-tested; the DOM/canvas ones are verified in the browser. */
 
+import { viewPath } from './card';
+
 /** Host shown in provenance stamps; override with VITE_SITE_HOST when self-hosting. */
 export const SITE_HOST: string = import.meta.env.VITE_SITE_HOST ?? 'makroskop.nodalit.com';
 
@@ -10,13 +12,9 @@ export interface PermalinkParams {
 	skala: number;
 }
 
-/** Deep link to a scenario view; the scale is omitted when the view is the solved size. */
+/** Deep link to a scenario view: its prerendered page, which carries the view's own share tags. */
 export function permalink(origin: string, p: PermalinkParams): string {
-	const url = new URL('/scenarier/', origin);
-	url.searchParams.set('stod', p.stod);
-	url.searchParams.set('variant', p.variant);
-	if (p.skala !== 1) url.searchParams.set('skala', String(p.skala));
-	return url.toString();
+	return new URL(viewPath(p.stod, p.variant, p.skala), origin).toString();
 }
 
 export interface Provenance {

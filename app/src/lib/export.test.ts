@@ -2,18 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { permalink, provenanceLine, scenarioCsv, exportFilename, wrapLines, packagePermalink, packageFilename } from './export';
 
 describe('permalink', () => {
-	it('encodes shock, variant and a non-unit scale', () => {
+	it('is the prerendered view page, scale as a path segment', () => {
 		expect(permalink('https://makroskop.nodalit.com', { stod: 'Rente', variant: '_ufin', skala: 1.5 })).toBe(
-			'https://makroskop.nodalit.com/scenarier/?stod=Rente&variant=_ufin&skala=1.5'
+			'https://makroskop.nodalit.com/scenarier/Rente_ufin/1.5/'
 		);
 	});
-	it('omits the scale when it is 1', () => {
-		expect(permalink('https://x.dk', { stod: 'Bundskat', variant: '_ufin', skala: 1 })).toBe(
-			'https://x.dk/scenarier/?stod=Bundskat&variant=_ufin'
-		);
+	it('omits the scale segment when it is 1', () => {
+		expect(permalink('https://x.dk', { stod: 'Bundskat', variant: '_ufin', skala: 1 })).toBe('https://x.dk/scenarier/Bundskat_ufin/');
 	});
 	it('keeps negative (mirrored) scales', () => {
-		expect(permalink('https://x.dk', { stod: 'Bundskat', variant: '_ufin', skala: -0.5 })).toContain('skala=-0.5');
+		expect(permalink('https://x.dk', { stod: 'Bundskat', variant: '_ufin', skala: -0.5 })).toBe('https://x.dk/scenarier/Bundskat_ufin/-0.5/');
 	});
 });
 
