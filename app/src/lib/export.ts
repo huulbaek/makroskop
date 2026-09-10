@@ -2,6 +2,8 @@
  *  The pure functions are unit-tested; the DOM/canvas ones are verified in the browser. */
 
 import { viewPath } from './card';
+import { wrapLines } from './text';
+export { wrapLines };
 
 /** Host shown in provenance stamps; override with VITE_SITE_HOST when self-hosting. */
 export const SITE_HOST: string = import.meta.env.VITE_SITE_HOST ?? 'makroskop.nodalit.com';
@@ -58,22 +60,6 @@ export function scenarioCsv(opts: { years: number[]; columns: CsvColumn[]; prove
 	return lines.join('\n') + '\n';
 }
 
-/** Greedy word wrap against a text measurer (canvas measureText in practice). */
-export function wrapLines(measure: (text: string) => number, text: string, maxWidth: number): string[] {
-	const lines: string[] = [];
-	let current = '';
-	for (const word of text.split(' ')) {
-		const candidate = current ? `${current} ${word}` : word;
-		if (current && measure(candidate) > maxWidth) {
-			lines.push(current);
-			current = word;
-		} else {
-			current = candidate;
-		}
-	}
-	if (current) lines.push(current);
-	return lines;
-}
 
 export function exportFilename(p: { stod: string; variant: string; key: string | null; skala: number; ext: string }): string {
 	const parts = [`makroskop_${p.stod}${p.variant}`];
