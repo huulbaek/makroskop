@@ -80,9 +80,10 @@ export function cardSvg(card: CardData): string {
 	const { size, lines } = fitHeadline(card.headline);
 	const lineHeight = size * 1.08;
 	let y = 190 + size;
-	const headlineText = lines.join(' ');
-	parts.push(text(M, Math.round(y), headlineText, `font-family="${display}" font-size="${size}" font-weight="600" fill="${LIGHT.ink}"`));
-	y += lineHeight;
+	for (const line of lines) {
+		parts.push(text(M, Math.round(y), line, `font-family="${display}" font-size="${size}" font-weight="600" fill="${LIGHT.ink}"`));
+		y += lineHeight;
+	}
 	parts.push(text(M, Math.round(y + 14), card.subline, `font-family="${body}" font-size="26" fill="${LIGHT.muted}"`));
 
 	// sparkline: qBNP years 0..15 after the shock, texture at the right

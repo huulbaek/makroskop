@@ -38,8 +38,15 @@ describe('cardSvg', () => {
 		expect(svg).toContain('fill="#fbfbf8"');
 	});
 	it('carries the headline, subline, kicker, tiles and footer', () => {
-		for (const text of ['ECB-renten +0,5 pct.-point', 'Varigt stød', 'stødår 2030', '−5.500', 'personer', 'Beskæftigelse, år 1', 'BNP, år 3', '−0,6', 'Offentlig saldo, år 1', 'MAKRO 2026-June', 'makroskop.nodalit.com']) {
+		for (const text of ['>ECB-renten +0,5</text>', '>pct.-point</text>', 'Varigt stød', 'stødår 2030', '−5.500', 'personer', 'Beskæftigelse, år 1', 'BNP, år 3', '−0,6', 'Offentlig saldo, år 1', 'MAKRO 2026-June', 'makroskop.nodalit.com']) {
 			expect(svg).toContain(text);
+		}
+	});
+	it('renders each fitted headline line as its own text element', () => {
+		const { lines, size } = fitHeadline(sample.headline);
+		expect(lines).toHaveLength(2);
+		for (const line of lines) {
+			expect(svg).toContain(`font-size="${size}" font-weight="600" fill="#171d1c">${line}</text>`);
 		}
 	});
 	it('renders a missing tile value as an en dash and escapes text', () => {
