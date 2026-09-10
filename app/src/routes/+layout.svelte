@@ -46,8 +46,14 @@
 		return page.url.pathname.startsWith(href.replace(/\/$/, ''));
 	}
 
-	/** A prerendered scenario view hands its own card up through page data. */
-	const card = $derived(page.data.card as CardHead | undefined);
+	/** A prerendered scenario view hands its own card up through page data. `page.data`
+	 *  survives `replaceState` (SvelteKit does not re-run load on a shallow navigation), so
+	 *  after moving the slider or picking another shock on a view page the generic page
+	 *  title takes over instead of keeping the stale card — gate the card on the URL. */
+	const card = $derived.by((): CardHead | undefined => {
+		const data = page.data.card as CardHead | undefined;
+		return data && page.url.pathname === new URL(data.url).pathname ? data : undefined;
+	});
 	const current = $derived(links.find((link) => isActive(link.href)));
 	const description = $derived(card?.description ?? current?.description ?? SITE_DESCRIPTION);
 	const ogTitle = $derived(card?.title ?? (current ? `${current.label} · MAKROskop` : 'MAKROskop – udforsk MAKRO uden licens'));
