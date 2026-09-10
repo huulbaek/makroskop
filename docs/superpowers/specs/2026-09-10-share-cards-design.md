@@ -59,10 +59,20 @@ aligned by years since the shock. The published 2030 runs can therefore be prese
 Inputs: `ShockMeta`, `Scenario` (definition + deviations), `Meta` (variations, year range,
 model name), baseline levels for `nL` and `vBNP` in the shock year, and `scale`.
 
-- **Change in words** — the page's rule: `delta ≠ 0` → `±x pct.-point`, else `±(factor−1)·100
-  pct.`, times `scale`, Danish formatting (`formatSigned`).
+- **Change in words** — `scalableChange(def)` first classifies the instrument: a plain rate
+  change (`factor = 1`, `|delta| < 1`) or a plain percentage increase (`delta = 0`, `factor >
+  1`) — the two cases the numeric rule can state and scale. For those, `delta ≠ 0` → `±x
+  pct.-point`, else `±(factor−1)·100 pct.` (keeping an "af satsen" suffix from `changeDa` when
+  present), times `scale`, Danish formatting (`formatSigned`). Anything else (a factor below 1
+  on a disutility parameter such as `uh`, a delta in mia. kr.) is worded by the catalog's own
+  `changeDa` verbatim at scale 1, and as "×<skala> af standardstødet (<changeDa>)" at other
+  scales, since the numeric rule cannot be trusted to state or scale that unit.
 - **Instrument name** — `definition.instrumentDa` when it is 24 characters or shorter, else
   the shock's `labelDa` (e.g. "Udenlandske priser" instead of the long import-price label).
+  One override, `INSTRUMENT_SHORT`, names the Loen shock's headline subject as "Arbejdsgivernes
+  forhandlingsvægt": DREAM's `rLoenNash` instrument is the employers' Nash weight, but the
+  catalog labels the shock as workers' bargaining power, and the numeric sign only holds
+  against the side that actually moves.
 - **Profile word** — `_perm`/`_ufin`: "varigt"; `_midl`: "midlertidigt"; `_blip`: "i ét år".
 - **Closure word** — `_perm`: "finansieret via lukkeskat"; otherwise "ufinansieret".
 - **Three fixed tiles** (years counted from `definition.firstYear` = year 1):
@@ -95,10 +105,13 @@ model name), baseline levels for `nL` and `vBNP` in the shock year, and `scale`.
   copied into `card.ts` with a comment naming the tokens.
 - Wordmark "MAKROskop" top-left (Newsreader, teal "skop" as on og.png). Kicker to its right in
   muted IBM Plex Sans: "Scenarie · <closure word> · stødår <firstYear>, vist som år efter stødet".
-- Headline: `<instrument> <change>` in Newsreader SemiBold, 72 px, at most two lines; the
-  profile word as a muted 28 px subline ("Varigt stød" / "Midlertidigt stød" / "1-årigt stød").
+- Headline: `<instrument> <change>` in Newsreader SemiBold, at most two lines at 72 px,
+  shrinking to 62 then 54 px, and three lines at 54 px as a last resort; the profile word as a
+  muted 28 px subline ("Varigt stød" / "Midlertidigt stød" / "1-årigt stød").
 - A faint `qBNP` sparkline for years 0–15 after the shock (300 × 110 px, series blue at 60 %
-  opacity, zero line) to the right of the headline. Texture, not the message.
+  opacity, zero line) to the right of the headline. Texture, not the message. Years 0–15 where
+  year 0 is the year before the shock (`firstYear − 1`), the zero reference the other 15 points
+  move away from — not the shock year itself, which the tiles call "år 1".
 - Three tiles across the lower half: label (Plex Sans Medium 22 px, muted), value
   (Newsreader 84 px, ink), unit (Plex Sans 26 px, muted). Negative values keep the true minus.
 - Footer rule; left "MAKRO 2026-June · MAKROskops frie løser" (muted 22 px), right
