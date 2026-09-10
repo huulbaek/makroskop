@@ -48,6 +48,15 @@ describe('cardSvg', () => {
 		for (const line of lines) {
 			expect(svg).toContain(`font-size="${size}" font-weight="600" fill="#171d1c">${line}</text>`);
 		}
+		// Verify subline is positioned between last headline line and tiles (y < 420, y > last headline baseline)
+		const lastHeadlineYMatch = svg.match(/<text x="72" y="(\d+)"[^>]*>pct\.-point</);
+		const sublineYMatch = svg.match(/<text x="72" y="(\d+)"[^>]*>Varigt stød</);
+		expect(lastHeadlineYMatch).toBeTruthy();
+		expect(sublineYMatch).toBeTruthy();
+		const lastHeadlineY = parseInt(lastHeadlineYMatch![1]);
+		const sublineY = parseInt(sublineYMatch![1]);
+		expect(sublineY).toBeGreaterThan(lastHeadlineY);
+		expect(sublineY).toBeLessThan(420);
 	});
 	it('renders a missing tile value as an en dash and escapes text', () => {
 		expect(svg).toContain('>–<');

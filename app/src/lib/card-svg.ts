@@ -79,12 +79,13 @@ export function cardSvg(card: CardData): string {
 	// headline + subline
 	const { size, lines } = fitHeadline(card.headline);
 	const lineHeight = size * 1.08;
-	let y = 190 + size;
+	let y = 150 + size;
 	for (const line of lines) {
 		parts.push(text(M, Math.round(y), line, `font-family="${display}" font-size="${size}" font-weight="600" fill="${LIGHT.ink}"`));
 		y += lineHeight;
 	}
-	parts.push(text(M, Math.round(y + 14), card.subline, `font-family="${body}" font-size="26" fill="${LIGHT.muted}"`));
+	const lastHeadlineBaseline = y - lineHeight;
+	parts.push(text(M, Math.round(lastHeadlineBaseline + 40), card.subline, `font-family="${body}" font-size="26" fill="${LIGHT.muted}"`));
 
 	// sparkline: qBNP years 0..15 after the shock, texture at the right
 	const box = { x: 828, y: 168, w: 300, h: 110 };
@@ -97,19 +98,19 @@ export function cardSvg(card: CardData): string {
 	const column = (W - 2 * M) / 3;
 	card.tiles.forEach((tile, i) => {
 		const x = M + i * column;
-		parts.push(text(x, 404, `${tile.label}, år ${tile.year}`, `font-family="${body}" font-size="22" font-weight="500" fill="${LIGHT.muted}"`));
+		parts.push(text(x, 420, `${tile.label}, år ${tile.year}`, `font-family="${body}" font-size="22" font-weight="500" fill="${LIGHT.muted}"`));
 		if (tile.value == null) {
-			parts.push(text(x, 494, '–', `font-family="${display}" font-size="84" font-weight="500" fill="${LIGHT.muted}"`));
+			parts.push(text(x, 510, '–', `font-family="${display}" font-size="84" font-weight="500" fill="${LIGHT.muted}"`));
 		} else {
-			parts.push(text(x, 494, tile.value, `font-family="${display}" font-size="84" font-weight="500" fill="${LIGHT.ink}"`));
-			parts.push(text(x, 534, tile.unit, `font-family="${body}" font-size="24" fill="${LIGHT.muted}"`));
+			parts.push(text(x, 510, tile.value, `font-family="${display}" font-size="84" font-weight="500" fill="${LIGHT.ink}"`));
+			parts.push(text(x, 550, tile.unit, `font-family="${body}" font-size="24" fill="${LIGHT.muted}"`));
 		}
 	});
 
 	// footer
-	parts.push(`<line x1="${M}" y1="566" x2="${W - M}" y2="566" stroke="${LIGHT.rule}" stroke-width="1"/>`);
-	parts.push(text(M, 602, `${card.model} · MAKROskops frie løser`, `font-family="${body}" font-size="20" fill="${LIGHT.muted}"`));
-	parts.push(text(W - M, 602, 'makroskop.nodalit.com', `text-anchor="end" font-family="${mono}" font-size="20" fill="${LIGHT.muted}"`));
+	parts.push(`<line x1="${M}" y1="584" x2="${W - M}" y2="584" stroke="${LIGHT.rule}" stroke-width="1"/>`);
+	parts.push(text(M, 614, `${card.model} · MAKROskops frie løser`, `font-family="${body}" font-size="20" fill="${LIGHT.muted}"`));
+	parts.push(text(W - M, 614, 'makroskop.nodalit.com', `text-anchor="end" font-family="${mono}" font-size="20" fill="${LIGHT.muted}"`));
 	parts.push('</svg>');
 	return parts.join('\n');
 }
