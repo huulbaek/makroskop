@@ -68,7 +68,12 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
   solved shocks, `?Bundskat=-1&Offentligt_forbrug=0.5&variant=_perm`; pure logic in
   `lib/package.ts`), Validering (two-solver comparison, DREAM's 2021 multipliers via `etl/multipliers.py`,
   DREAM's May 2025 shock reactions via `etl/dream_comparison.py` from the figure readings in
-  `etl/dream_may2025.json`). Build: `bun run build`.
+  `etl/dream_may2025.json`).
+  Share cards: one prerendered page per scenario view at `/scenarier/<view>/<skala>/`
+  (`src/routes/scenarier/[scenario]/[[skala]]/`, copy in `lib/card.ts`, image in
+  `lib/card-svg.ts` rendered by `scripts/og-images.ts` during `bun run build`; fonts vendored
+  in `app/fonts/`). `bun run verify:build` checks the output. Design: docs/superpowers/specs/2026-09-10-share-cards-design.md.
+  Build: `bun run build`.
 - `etl/` — Python (uv). `extract.py` writes `app/static/data/*.json` from GDX files.
   `freesolver.py` is the license-free solver: parse / check / jacobian / newton /
   oracle / solve-export / export-baseline. Cache in `etl/cache/` (regenerable).
