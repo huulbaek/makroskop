@@ -66,6 +66,7 @@ const MINUS = '−';
 const da1 = new Intl.NumberFormat('da-DK', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const da2 = new Intl.NumberFormat('da-DK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const da0 = new Intl.NumberFormat('da-DK', { maximumFractionDigits: 0 });
+const daScale = new Intl.NumberFormat('da-DK', { maximumFractionDigits: 2 });
 
 function signed(text: string, value: number): string {
 	if (!/[1-9]/.test(text)) return text.replace(/^-/, ''); // rounds to zero: no sign at all
@@ -84,11 +85,22 @@ export function formatPersons(value: number): string {
 	return signed(da0.format(rounded), rounded);
 }
 
+/** Whether the instrument moves in a unit the numeric rule can state and scale: a plain rate
+ *  change (factor 1, |delta| < 1 → pct.-point) or a plain percentage increase (delta 0, factor > 1).
+ *  Anything else (a factor below 1 on a disutility parameter, a delta in mia. kr.) is worded by the
+ *  catalog's own changeDa. */
+export function scalableChange(def: Pick<ScenarioDefinition, 'delta' | 'factor'>): boolean {
+	return (def.delta !== 0 && def.factor === 1 && Math.abs(def.delta) < 1) || (def.delta === 0 && def.factor > 1);
+}
+
 /** The shock size in the instrument's own unit, the page's rule. */
-export function changeText(def: Pick<ScenarioDefinition, 'delta' | 'factor'>, scale: number): string {
-	const formattedValue = formatSigned(def.delta !== 0 ? def.delta * 100 * scale : (def.factor - 1) * 100 * scale).replace('-', MINUS);
-	const unit = def.delta !== 0 ? 'pct.-point' : 'pct.';
-	return `${formattedValue} ${unit}`;
+export function changeText(def: Pick<ScenarioDefinition, 'delta' | 'factor' | 'changeDa'>, scale: number): string {
+	if (!scalableChange(def)) {
+		return scale === 1 ? def.changeDa : `×${daScale.format(scale).replace('-', MINUS)} af standardstødet (${def.changeDa})`;
+	}
+	if (def.delta !== 0) return `${formatSigned(def.delta * 100 * scale).replace('-', MINUS)} pct.-point`;
+	const suffix = def.changeDa.endsWith('af satsen') ? ' af satsen' : '';
+	return `${formatSigned((def.factor - 1) * 100 * scale).replace('-', MINUS)} pct.${suffix}`;
 }
 
 const PROFILE_WORD: Record<string, string> = { _perm: 'varigt', _ufin: 'varigt', _midl: 'midlertidigt', _blip: 'i ét år' };
@@ -96,6 +108,11 @@ const PROFILE_SUBLINE: Record<string, string> = {
 	_perm: 'Varigt stød', _ufin: 'Varigt stød', _midl: 'Midlertidigt stød (AR-profil)', _blip: '1-årigt stød'
 };
 const MAX_INSTRUMENT_CHARS = 24;
+
+/** Headline subject where the catalog label names the other side of the instrument: the Loen shock
+ *  lowers the employers' Nash weight, which the catalog labels as workers' bargaining power. The
+ *  numeric sign only holds against the side that moves. A catalog `shortDa` is the proper home. */
+const INSTRUMENT_SHORT: Record<string, string> = { Loen: 'Arbejdsgivernes forhandlingsvægt' };
 
 function closureWord(variation: string): string {
 	return variation === '_perm' ? 'finansieret via lukkeskat' : 'ufinansieret';
@@ -169,7 +186,7 @@ export function buildCard(input: {
 	];
 	const [persons, bnp, saldo] = tiles;
 
-	const instrument = def.instrumentDa.length <= MAX_INSTRUMENT_CHARS ? def.instrumentDa : shock.labelDa;
+	const instrument = INSTRUMENT_SHORT[shock.name] ?? (def.instrumentDa.length <= MAX_INSTRUMENT_CHARS ? def.instrumentDa : shock.labelDa);
 	const change = changeText(def, scale);
 	const headline = `${instrument} ${change}`;
 	const closure = closureWord(scenario.variation);

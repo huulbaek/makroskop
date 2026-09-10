@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Scenario, ShockMeta } from './data';
 import {
 	ALL_SCALE_STEPS, buildCard, changeText, formatPersons, formatTileValue, imageFile, parseSkala,
-	scaleSteps, shareViews, splitView, viewPath
+	scalableChange, scaleSteps, shareViews, splitView, viewPath
 } from './card';
 
 const YEAR_START = 1985;
@@ -62,10 +62,34 @@ describe('formatting', () => {
 		expect(formatPersons(347)).toBe('+350');
 		expect(formatPersons(-3)).toBe('0');
 	});
-	it('words the change in the instrument unit', () => {
-		expect(changeText({ delta: 0.01, factor: 1 }, 0.5)).toBe('+0,5 pct.-point');
-		expect(changeText({ delta: 0, factor: 1.01 }, 2)).toBe('+2 pct.');
-		expect(changeText({ delta: 0.01, factor: 1 }, -0.5)).toBe('−0,5 pct.-point');
+	it('words the change in the instrument unit for scalable shocks', () => {
+		expect(changeText({ delta: 0.01, factor: 1, changeDa: '+1 pct.-point (100 basispoint)' }, 0.5)).toBe('+0,5 pct.-point');
+		expect(changeText({ delta: 0, factor: 1.01, changeDa: '+1 pct.' }, 2)).toBe('+2 pct.');
+		expect(changeText({ delta: 0.01, factor: 1, changeDa: '+1 pct.-point (100 basispoint)' }, -0.5)).toBe('−0,5 pct.-point');
+	});
+	it('identifies which shocks the numeric rule can scale', () => {
+		expect(scalableChange({ delta: 0.01, factor: 1 })).toBe(true);
+		expect(scalableChange({ delta: 0, factor: 1.01 })).toBe(true);
+		expect(scalableChange({ delta: 0, factor: 0.9900990099009901 })).toBe(false);
+		expect(scalableChange({ delta: 10, factor: 1 })).toBe(false);
+		expect(scalableChange({ delta: -0.01, factor: 1 })).toBe(true);
+	});
+	it('words a disutility-parameter shock verbatim from the catalog, scaling only by a multiplier note', () => {
+		expect(changeText({ delta: 0, factor: 0.9900990099009901, changeDa: '+1 pct. strukturel arbejdstid' }, 1))
+			.toBe('+1 pct. strukturel arbejdstid');
+		expect(changeText({ delta: 0, factor: 0.9900990099009901, changeDa: '+1 pct. strukturel arbejdstid' }, 0.5))
+			.toBe('×0,5 af standardstødet (+1 pct. strukturel arbejdstid)');
+	});
+	it('words a mia.-kr. delta shock verbatim, with the true minus in the scale note', () => {
+		expect(changeText({ delta: 10, factor: 1, changeDa: '+10 mia. kr. årligt' }, 1)).toBe('+10 mia. kr. årligt');
+		expect(changeText({ delta: 10, factor: 1, changeDa: '+10 mia. kr. årligt' }, -1)).toBe('×−1 af standardstødet (+10 mia. kr. årligt)');
+	});
+	it('scales an "af satsen" change as a plain percentage', () => {
+		expect(changeText({ delta: 0, factor: 1.1, changeDa: '+10 pct. af satsen' }, 1)).toBe('+10 pct. af satsen');
+		expect(changeText({ delta: 0, factor: 1.1, changeDa: '+10 pct. af satsen' }, 0.5)).toBe('+5 pct. af satsen');
+	});
+	it('keeps the existing pct.-point scaling', () => {
+		expect(changeText({ delta: 0.01, factor: 1, changeDa: '+1 pct.-point (100 basispoint)' }, 0.5)).toBe('+0,5 pct.-point');
 	});
 });
 
@@ -119,6 +143,20 @@ describe('buildCard', () => {
 		expect(card.tiles[2].value).toBeNull();
 		expect(card.description).not.toContain('offentlig saldo');
 		expect(card.description).toContain('Beskæftigelse −10.900 personer i år 1, BNP −1,2 pct. efter 3 år.');
+	});
+	it('uses the display-subject override for a shock whose catalog label names the other side', () => {
+		const loenShock: ShockMeta = {
+			name: 'Loen', labelDa: 'Lønmodtagernes forhandlingsstyrke', labelEn: 'Wage bargaining power',
+			group: 'Præferencer', available: ['_ufin']
+		};
+		const s = scenario({ shock: 'Loen' });
+		s.definition = {
+			...s.definition!,
+			instrumentDa: 'Arbejdsgivernes forhandlingsvægt i lønforhandlingen',
+			delta: -0.01, factor: 1, changeDa: '−1 pct.-point (lønmodtagerne står stærkere)'
+		};
+		const card = buildCard({ shock: loenShock, scenario: s, yearStart: YEAR_START, modelName: 'M', levels, scale: 1 })!;
+		expect(card.headline).toBe('Arbejdsgivernes forhandlingsvægt −1 pct.-point');
 	});
 	it('needs baseline levels for persons and a definition at all', () => {
 		const card = buildCard({ shock: rente, scenario: scenario(), yearStart: YEAR_START, modelName: 'M', levels: null, scale: 1 })!;
