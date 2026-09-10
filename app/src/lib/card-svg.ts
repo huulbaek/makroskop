@@ -34,14 +34,21 @@ export function escapeXml(text: string): string {
 		.replace(/'/g, '&apos;');
 }
 
-/** Largest size at which the headline fits two lines; three lines at the smallest size otherwise. */
+/** Largest size at which the headline fits two lines that each measure within HEADLINE_WIDTH;
+ *  three lines at the smallest size otherwise. wrapLines only breaks at spaces, so a single word
+ *  wider than the column still overflows its line — checking each line's width (not just the
+ *  line count) catches that instead of shipping an overflowing image. Never slices: a headline
+ *  that fits no size throws, loudly, at build time. */
 export function fitHeadline(text: string): { size: number; lines: string[] } {
+	const fitsWidth = (lines: string[], size: number) => lines.every((line) => line.length * DISPLAY_EM * size <= HEADLINE_WIDTH);
 	for (const size of HEADLINE_SIZES) {
 		const lines = wrapLines((t) => t.length * DISPLAY_EM * size, text, HEADLINE_WIDTH);
-		if (lines.length <= 2) return { size, lines };
+		if (lines.length <= 2 && fitsWidth(lines, size)) return { size, lines };
 	}
 	const size = HEADLINE_SIZES[HEADLINE_SIZES.length - 1];
-	return { size, lines: wrapLines((t) => t.length * DISPLAY_EM * size, text, HEADLINE_WIDTH).slice(0, 3) };
+	const lines = wrapLines((t) => t.length * DISPLAY_EM * size, text, HEADLINE_WIDTH);
+	if (lines.length <= 3 && fitsWidth(lines, size)) return { size, lines };
+	throw new Error(`headline does not fit the card: "${text}"`);
 }
 
 /** Polyline through the non-null values, y scaled to the box with zero inside it. */

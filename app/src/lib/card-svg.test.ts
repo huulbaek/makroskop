@@ -8,6 +8,10 @@ describe('escapeXml', () => {
 	});
 });
 
+const DISPLAY_EM = 0.46;
+const HEADLINE_WIDTH = 690;
+const fitsWidth = (lines: string[], size: number) => Math.max(...lines.map((l) => l.length * DISPLAY_EM * size)) <= HEADLINE_WIDTH;
+
 describe('fitHeadline', () => {
 	it('keeps a short headline on one 72 px line', () => {
 		expect(fitHeadline('Rente +1 pct.-point')).toEqual({ size: 72, lines: ['Rente +1 pct.-point'] });
@@ -18,6 +22,15 @@ describe('fitHeadline', () => {
 		const long = fitHeadline('Offentlig beskæftigelse og offentligt varekøb +12,5 pct. i alle brancher');
 		expect(long.size).toBeLessThan(72);
 		expect(long.lines.length).toBeLessThanOrEqual(3);
+		expect(fitsWidth(long.lines, long.size)).toBe(true);
+	});
+	it('shrinks a single long unbreakable word until it fits by width, not just by line count', () => {
+		const { size, lines } = fitHeadline('Arbejdskraftproduktivitet +1 pct.');
+		expect(size).toBeLessThan(72);
+		expect(fitsWidth(lines, size)).toBe(true);
+	});
+	it('throws rather than silently slicing a headline that fits no size', () => {
+		expect(() => fitHeadline('A'.repeat(200))).toThrow(/does not fit the card/);
 	});
 });
 

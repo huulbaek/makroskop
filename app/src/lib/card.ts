@@ -93,10 +93,16 @@ export function scalableChange(def: Pick<ScenarioDefinition, 'delta' | 'factor'>
 	return (def.delta !== 0 && def.factor === 1 && Math.abs(def.delta) < 1) || (def.delta === 0 && def.factor > 1);
 }
 
+/** A bare "×<scale>" label, true minus — the short image headline for a scaled shock whose
+ *  full change text (catalog changeDa plus the "af standardstødet" note) is too long to fit. */
+export function scaleLabel(scale: number): string {
+	return `×${daScale.format(scale).replace('-', MINUS)}`;
+}
+
 /** The shock size in the instrument's own unit, the page's rule. */
 export function changeText(def: Pick<ScenarioDefinition, 'delta' | 'factor' | 'changeDa'>, scale: number): string {
 	if (!scalableChange(def)) {
-		return scale === 1 ? def.changeDa : `×${daScale.format(scale).replace('-', MINUS)} af standardstødet (${def.changeDa})`;
+		return scale === 1 ? def.changeDa : `${scaleLabel(scale)} af standardstødet (${def.changeDa})`;
 	}
 	if (def.delta !== 0) return `${formatSigned(def.delta * 100 * scale).replace('-', MINUS)} pct.-point`;
 	const suffix = def.changeDa.endsWith('af satsen') ? ' af satsen' : '';
@@ -189,6 +195,14 @@ export function buildCard(input: {
 	const instrument = INSTRUMENT_SHORT[shock.name] ?? (def.instrumentDa.length <= MAX_INSTRUMENT_CHARS ? def.instrumentDa : shock.labelDa);
 	const change = changeText(def, scale);
 	const headline = `${instrument} ${change}`;
+	/** A scaled catalog-worded shock's full change text ("×0,5 af standardstødet (+10 mia. kr.
+	 *  årligt)") can run to three unfittable lines on the image. Title and description keep the
+	 *  full text; the image headline shortens to the bare scale, moving the standardstød to the
+	 *  subline. */
+	const shortForm = !scalableChange(def) && scale !== 1;
+	const profileWord = PROFILE_SUBLINE[scenario.variation] ?? 'Varigt stød';
+	const cardHeadline = shortForm ? `${instrument} ${scaleLabel(scale)}` : headline;
+	const subline = shortForm ? `${profileWord} · standardstød ${def.changeDa}` : profileWord;
 	const closure = closureWord(scenario.variation);
 	const question = `Hvad sker der i MAKRO, hvis ${instrument} ${PROFILE_WORD[scenario.variation] ?? 'varigt'} ændres med ${change}?`;
 	const numbers = [
@@ -214,8 +228,8 @@ export function buildCard(input: {
 		title: bnp.value == null ? headline : `${headline}: BNP ${bnp.value} pct. efter 3 år`,
 		description,
 		imageAlt: `${question} Tre nøgletal: BNP efter 3 år, beskæftigelse og offentlig saldo i år 1.`,
-		headline,
-		subline: PROFILE_SUBLINE[scenario.variation] ?? 'Varigt stød',
+		headline: cardHeadline,
+		subline,
 		kicker: `Scenarie · ${closure} · stødår ${y1}, vist som år efter stødet`,
 		closure,
 		tiles,

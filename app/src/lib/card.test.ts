@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Scenario, ShockMeta } from './data';
 import {
 	ALL_SCALE_STEPS, buildCard, changeText, formatPersons, formatTileValue, imageFile, parseSkala,
-	scalableChange, scaleSteps, shareViews, splitView, viewPath
+	scalableChange, scaleLabel, scaleSteps, shareViews, splitView, viewPath
 } from './card';
 
 const YEAR_START = 1985;
@@ -91,6 +91,11 @@ describe('formatting', () => {
 	it('keeps the existing pct.-point scaling', () => {
 		expect(changeText({ delta: 0.01, factor: 1, changeDa: '+1 pct.-point (100 basispoint)' }, 0.5)).toBe('+0,5 pct.-point');
 	});
+	it('formats a bare scale label with the true minus', () => {
+		expect(scaleLabel(0.5)).toBe('×0,5');
+		expect(scaleLabel(-1)).toBe('×−1');
+		expect(scaleLabel(1.25)).toBe('×1,25');
+	});
 });
 
 describe('buildCard', () => {
@@ -157,6 +162,21 @@ describe('buildCard', () => {
 		};
 		const card = buildCard({ shock: loenShock, scenario: s, yearStart: YEAR_START, modelName: 'M', levels, scale: 1 })!;
 		expect(card.headline).toBe('Arbejdsgivernes forhandlingsvægt −1 pct.-point');
+	});
+	it('shortens the headline and adds the full change to the subline for a scaled catalog-worded shock', () => {
+		const s = scenario();
+		s.definition = { ...s.definition!, instrumentDa: 'Øvrige overførsler', delta: 10, factor: 1, changeDa: '+10 mia. kr. årligt' };
+		const card = build(0.5, s);
+		expect(card.headline).toBe('Øvrige overførsler ×0,5');
+		expect(card.subline).toBe('Varigt stød · standardstød +10 mia. kr. årligt');
+		expect(card.title).toContain('×0,5 af standardstødet (+10 mia. kr. årligt)');
+	});
+	it('keeps the full-length headline and subline for a catalog-worded shock at its solved size', () => {
+		const s = scenario();
+		s.definition = { ...s.definition!, instrumentDa: 'Øvrige overførsler', delta: 10, factor: 1, changeDa: '+10 mia. kr. årligt' };
+		const card = build(1, s);
+		expect(card.headline).toBe('Øvrige overførsler +10 mia. kr. årligt');
+		expect(card.subline).toBe('Varigt stød');
 	});
 	it('needs baseline levels for persons and a definition at all', () => {
 		const card = buildCard({ shock: rente, scenario: scenario(), yearStart: YEAR_START, modelName: 'M', levels: null, scale: 1 })!;
