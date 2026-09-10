@@ -27,7 +27,7 @@ function scenario(overrides: Partial<Scenario> = {}): Scenario {
 		},
 		modelVersion: null,
 		deviations: {
-			qBNP: series({ 2030: -0.842, 2031: -1.093, 2032: -1.159, 2035: -1.15, 2045: -1.4 }),
+			qBNP: series({ 2029: 0, 2030: -0.842, 2031: -1.093, 2032: -1.159, 2035: -1.15, 2045: -1.4 }),
 			nL: series({ 2030: -0.347, 2031: -0.355 }),
 			saldo2bnp: series({ 2030: -0.97, 2031: -0.958 })
 		},
@@ -89,7 +89,7 @@ describe('buildCard', () => {
 		expect(card.path).toBe('/scenarier/Rente_ufin/0.5/');
 		expect(card.image).toBe('Rente_ufin_0.5.png');
 		expect(card.sparkline).toHaveLength(16);
-		expect(card.sparkline[0]).toBeCloseTo(-0.421, 3);
+		expect(card.sparkline[0]).toBe(0);
 		expect(card.imageAlt).toContain('Tre nøgletal');
 	});
 	it('drops the scaling suffix at the solved size and marks mirrored views', () => {

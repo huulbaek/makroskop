@@ -202,7 +202,7 @@ export function buildCard(input: {
 		kicker: `Scenarie · ${closure} · stødår ${y1}, vist som år efter stødet`,
 		closure,
 		tiles,
-		sparkline: Array.from({ length: 16 }, (_, k) => at('qBNP', y1 + k)),
+		sparkline: Array.from({ length: 16 }, (_, k) => at('qBNP', y1 - 1 + k)),
 		model: input.modelName
 	};
 }
