@@ -35,11 +35,13 @@
 		available: ['']
 	};
 
-	let selectedName = $state('_demo');
-	let selectedVariation = $state('');
+	/** Prerendered view pages seed from `initial`, so the built HTML shows the right shock,
+	 *  variant, scale and loading state before hydration — not the demo/pending markup. */
+	let selectedName = $state(initial?.name ?? '_demo');
+	let selectedVariation = $state(initial?.variation ?? '');
 	const daScale = new Intl.NumberFormat('da-DK', { maximumFractionDigits: 2 });
 	let override: Scenario | null | 'unset' = $state.raw('unset');
-	let loading = $state(false);
+	let loading = $state(!!initial);
 	/** Baseline nL/vBNP by year (persons tile), fetched once after mount. */
 	let levelsByYear: Record<number, { nL: number | null; vBNP: number | null }> = $state.raw({});
 	const scenario = $derived(override === 'unset' ? initialScenario : override);
@@ -50,7 +52,7 @@
 	 *  side of the baseline — no worse than the ×2 we already allow, but it is labelled. */
 	const UNSCALED = 1;
 	const scaleSteps = $derived(stepsFor(scenario?.definition?.maxScale));
-	let scaleIdx = $state(ALL_SCALE_STEPS.indexOf(UNSCALED));
+	let scaleIdx = $state(ALL_SCALE_STEPS.indexOf(initial?.scale ?? UNSCALED));
 	/** scaleIdx indexes scaleSteps, which shrinks when a scenario carries a cap. */
 	const boundedIdx = $derived(
 		scaleIdx >= 0 && scaleIdx < scaleSteps.length ? scaleIdx : scaleSteps.indexOf(UNSCALED)
@@ -494,7 +496,7 @@
 				<p class="kilde">Kilde: {provenance} · <a href={shareUrl}>{shareUrl}</a></p>
 			{/if}
 		{:else if loading}
-			<div class="card loading-card" aria-hidden="true">
+			<div class="card loading-card">
 				{#if tiles}
 					<div class="key-figures">
 						{#each tiles as tile (tile.key)}

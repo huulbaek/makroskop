@@ -29,6 +29,9 @@ for (const tag of ['og:title', 'og:description', 'og:image', 'og:image:alt', 'og
 check(sample.includes('content="https://makroskop.nodalit.com/og/Rente_ufin_0.5.png"'), 'sample: og:image is not the view image');
 check(sample.includes('<link rel="canonical" href="https://makroskop.nodalit.com/scenarier/Rente_ufin/0.5/"'), 'sample: canonical missing');
 check(sample.includes('vist som år efter stødet, lineært skaleret'), 'sample: honesty line missing from description');
+check(sample.includes('key-figures'), 'sample: prerendered HTML is missing the key-figures tiles');
+check(!sample.includes('Endnu ikke beregnet'), 'sample: prerendered HTML still shows the pending-scenario card');
+check(!sample.includes('<h2>Syntetisk demo-scenarie</h2>'), 'sample: prerendered HTML still shows the demo scenario');
 
 const bare = readFileSync(join(build, 'scenarier', 'index.html'), 'utf8');
 check(bare.includes('content="Scenarier · MAKROskop"'), 'bare page lost its generic og:title');
