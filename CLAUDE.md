@@ -111,8 +111,12 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
   single equation instance caused all the "line search failed"/tiny-alpha grinds (found with
   the worst-residual diagnostic, 2026-08-26). `Window` drops those equations and freezes the
   j-terms (`POLE_JTERMS`) — exact for all other variables since the j-terms appear nowhere
-  else; frozen j-terms export at reference values. Diagnose future stalls the same way: read
-  the `worst residual (...)` lines before touching the solver.
+  else; after the solve, `recompute_pole_jterms` solves the dropped equations for the
+  j-terms (affine in jr, two evaluations per instance) so the exported GDX carries the implied
+  rates; an instance whose lagged stock is below `POLE_SLOPE_FLOOR` (1 mia. kr.) exports as
+  UNDF and the counts are stamped in `makroskop_meta` as `pole_jterms` (makroskop-utt).
+  Diagnose future stalls the same way: read the `worst residual (...)` lines before touching
+  the solver.
 - KEEP `pardiso` FIRST in the backend chain: besides being the fast path, importing pypardiso
   loads MKL, and UMFPACK's BLAS then runs on MKL (parallel, `openmp_worker` threads) whenever the
   fallback is needed. kvxopt's bundled OpenBLAS is a serial build, so `FREESOLVER_BACKEND=umfpack,...`

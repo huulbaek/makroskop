@@ -420,6 +420,7 @@ class System:
         np.cumsum(var_counts, out=self.entry_offsets[1:])
         self._jac_kernel = make_jacobian_kernel()
         self._eval_kernel = make_kernel()
+        self._one_kernel = None
 
     def _index_free(self) -> None:
         self.free_ids = np.where(~self.is_fixed)[0]
@@ -437,6 +438,13 @@ class System:
     def residuals(self, x: np.ndarray, out: np.ndarray) -> np.ndarray:
         self._eval_kernel(self.code, self.args, self.consts, self.eq_offsets, self.rhs, x, out)
         return out
+
+    def residual_one(self, x: np.ndarray, eq: int) -> float:
+        """One equation's residual at x (0-based equation index)."""
+        if self._one_kernel is None:
+            self._one_kernel = make_single_eval()
+        return float(self._one_kernel(self.code, self.args, self.consts, self.eq_offsets,
+                                      self.rhs, x, eq))
 
     def jacobian_csc(self, x: np.ndarray):
         """Sparse Jacobian restricted to free-variable columns, duplicates summed."""
@@ -654,6 +662,15 @@ def cmd_solve_export(from_year: int, shock_name: str, shock_years: tuple[int, in
     window.residuals(x, residual)
     print(f"solved: ||r||_inf = {np.abs(residual[window.eq_sel]).max():.3e}")
     print(f"peak RSS this process: {peak_rss_gb():.1f} GB")
+    # The pole j-terms were frozen during the solve (Window); solve their equations for them now.
+    n_done, undefined = recompute_pole_jterms(system.residual_one, window.pole_pairs, x)
+    undefined_vars = set(undefined)
+    undefined_eqs = {e + 1 for e, v in window.pole_pairs if v in undefined_vars}
+    names = ", ".join(sorted(equation_names(convert_dir, undefined_eqs).values()))
+    print(f"pole j-terms: {n_done} implied rates recomputed from their equations, "
+          f"{len(undefined)} left undefined (UNDF; lagged stock below {POLE_SLOPE_FLOOR} mia. kr.)"
+          + (f": {names}" if names else ""), flush=True)
+    meta["pole_jterms"] = f"{n_done} recomputed, {len(undefined)} undefined"
     export_solution_gdx(convert_dir, x, out_path, meta={**meta, "share": "1.0"})
     checkpoint_path.unlink(missing_ok=True)
 
@@ -1102,13 +1119,21 @@ _PARDISO_REJECTIONS = [0]
 # jr(Obl) goes -15.9 -> +7.3). Every shock moves the crossing year, so the continuation had to
 # drag a j-term through infinity (AM_bidrag stuck near share 0.10, tBund crawling at 0.73;
 # batch2.log 2026-08-26, worst-residual diagnostic). The j-terms appear in no other equation,
-# so dropping the equation and freezing the j-term is exact for every other variable; frozen
-# j-terms are exported at their reference values.
+# so dropping the equation and freezing the j-term is exact for every other variable. After the
+# solve, recompute_pole_jterms solves the dropped equations for the j-terms (exact: they are
+# affine in jr) so the export carries the implied rates DREAM's model would report; an instance
+# whose lagged stock is essentially zero is exported as UNDF (makroskop-utt).
 POLE_JTERMS = ("jrUdlAktRenter", "jrUdlPasRenter", "jrUdlAktOmv", "jrUdlPasOmv")
 
 
-def load_pole_jterms(convert_dir: Path, is_fixed: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """0-based indices of (equations to drop, free j-term variables to freeze), matched per instance."""
+# Below this slope |∂residual/∂jr| = |stock(t-1)|/fv (≈ mia. kr. of lagged stock; fv ≈ 1.03) the
+# implied rate is left undefined (NaN → GDX UNDF) when the j-terms are recomputed after a solve:
+# the quotient income/stock is then solver noise. The reference never gets below 7.2.
+POLE_SLOPE_FLOOR = 1.0
+
+
+def load_pole_jterm_pairs(convert_dir: Path, is_fixed: np.ndarray) -> list[tuple[int, int]]:
+    """(equation index, j-term variable index) per pole instance, 0-based, free j-terms only."""
     eq_idx: dict[str, int] = {}   # "jrUdlAktRenter(Obl,2065)" -> equation index
     var_idx: dict[str, int] = {}
     section = ""
@@ -1133,11 +1158,30 @@ def load_pole_jterms(convert_dir: Path, is_fixed: np.ndarray) -> tuple[np.ndarra
                         eq_idx[f"{jterm}({args}"] = index
             elif section == "x" and parts[0][0] == "x" and name.partition("(")[0] in POLE_JTERMS:
                 var_idx[name] = index
-    pairs = [(e, var_idx[key]) for key, e in eq_idx.items()
-             if key in var_idx and not is_fixed[var_idx[key]]]
-    eqs = np.array(sorted(e for e, _ in pairs), dtype=np.int64)
-    variables = np.array(sorted(v for _, v in pairs), dtype=np.int64)
-    return eqs, variables
+    return [(e, var_idx[key]) for key, e in eq_idx.items()
+            if key in var_idx and not is_fixed[var_idx[key]]]
+
+
+def recompute_pole_jterms(evaluate, pairs: list[tuple[int, int]], x: np.ndarray,
+                          floor: float = POLE_SLOPE_FLOOR) -> tuple[int, list[int]]:
+    """Solve each dropped pole equation for its j-term at the solved point x, in place.
+
+    `evaluate(x, eq)` returns one equation residual. The residual is affine in the j-term
+    (income − (r + jr)·stock/fv), so two evaluations give the exact root. Returns the number of
+    j-terms recomputed and the variable ids left NaN because |slope| < floor (stock ≈ 0).
+    """
+    undefined: list[int] = []
+    for eq, var in pairs:
+        at_frozen = evaluate(x, eq)
+        x[var] += 1.0
+        slope = evaluate(x, eq) - at_frozen
+        x[var] -= 1.0
+        if abs(slope) < floor:
+            x[var] = np.nan
+            undefined.append(var)
+        else:
+            x[var] -= at_frozen / slope
+    return len(pairs) - len(undefined), undefined
 
 
 class ExtraEquations:
@@ -1251,7 +1295,8 @@ class Window:
     Starting the window a year before the shock instead solves that year too — a shock announced
     one year ahead (asset prices, investment, hiring and wages move before the instrument does).
 
-    The pole j-term equations (POLE_JTERMS) are excluded and their j-terms frozen.
+    The pole j-term equations (POLE_JTERMS) are excluded and their j-terms frozen during the
+    solve; `pole_pairs` lists the excluded instances for recompute_pole_jterms afterwards.
     """
 
     def __init__(self, system: System, convert_dir: Path, from_year: int,
@@ -1267,17 +1312,18 @@ class Window:
             eq_year = np.concatenate([eq_year, extra.years])
         self.eq_year = eq_year
         self.var_year = var_year
-        drop_eqs, freeze_vars = load_pole_jterms(convert_dir, system.is_fixed)
+        pairs = load_pole_jterm_pairs(convert_dir, system.is_fixed)
+        # the dropped instances, for recompute_pole_jterms after the solve
+        self.pole_pairs = [(e, v) for e, v in pairs if eq_year[e] >= from_year]
         keep_eq = np.ones(self.n_eq_total, dtype=bool)
-        keep_eq[drop_eqs] = False
+        keep_eq[[e for e, _ in pairs]] = False
         keep_var = np.ones(len(system.levels), dtype=bool)
-        keep_var[freeze_vars] = False
+        keep_var[[v for _, v in pairs]] = False
         self.eq_sel = np.where((eq_year >= from_year) & keep_eq)[0]
         free_year = var_year[system.free_ids]
         var_sel = np.where((free_year >= from_year) & keep_var[system.free_ids])[0]
-        dropped = int((eq_year[drop_eqs] >= from_year).sum())
-        if dropped:
-            print(f"dropped {dropped} implied-rate j-term equations (pole at zero stock); "
+        if self.pole_pairs:
+            print(f"dropped {len(self.pole_pairs)} implied-rate j-term equations (pole at zero stock); "
                   f"their j-terms are frozen at reference values", flush=True)
         assert len(self.eq_sel) == len(var_sel), (len(self.eq_sel), len(var_sel))
         self.window_vars = system.free_ids[var_sel]
