@@ -68,6 +68,7 @@ const da2 = new Intl.NumberFormat('da-DK', { minimumFractionDigits: 2, maximumFr
 const da0 = new Intl.NumberFormat('da-DK', { maximumFractionDigits: 0 });
 
 function signed(text: string, value: number): string {
+	if (!/[1-9]/.test(text)) return text.replace(/^-/, ''); // rounds to zero: no sign at all
 	return (value > 0 ? '+' : '') + text.replace('-', MINUS);
 }
 

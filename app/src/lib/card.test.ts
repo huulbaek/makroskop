@@ -52,10 +52,15 @@ describe('formatting', () => {
 		expect(formatTileValue(0.04)).toBe('+0,04');
 		expect(formatTileValue(-1.159)).toBe('−1,2');
 	});
+	it('drops the sign when the value rounds to zero', () => {
+		expect(formatTileValue(-0.001)).toBe('0,00');
+		expect(formatTileValue(0.004)).toBe('0,00');
+	});
 	it('rounds persons to hundreds, tens below a thousand', () => {
 		expect(formatPersons(-10939)).toBe('−10.900');
 		expect(formatPersons(-5469.5)).toBe('−5.500');
 		expect(formatPersons(347)).toBe('+350');
+		expect(formatPersons(-3)).toBe('0');
 	});
 	it('words the change in the instrument unit', () => {
 		expect(changeText({ delta: 0.01, factor: 1 }, 0.5)).toBe('+0,5 pct.-point');
