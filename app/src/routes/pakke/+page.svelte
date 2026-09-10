@@ -365,10 +365,6 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Pakker · MAKROskop</title>
-</svelte:head>
-
 <section class="intro">
 	<h1>Hvad koster pakken?</h1>
 	<p class="lede">

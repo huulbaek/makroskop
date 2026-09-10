@@ -2,6 +2,8 @@
 	import '../app.css';
 	import { page } from '$app/state';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+	import { SITE_URL } from '$lib/site';
+	import type { CardHead } from '$lib/card';
 
 	let { children, data } = $props();
 
@@ -34,9 +36,6 @@
 		}
 	];
 
-	/** Public origin, for tags that must be absolute (og:image). */
-	const SITE_URL = 'https://makroskop.nodalit.com';
-
 	const REPO_URL = 'https://github.com/huulbaek/makroskop';
 
 	const SITE_DESCRIPTION =
@@ -47,9 +46,18 @@
 		return page.url.pathname.startsWith(href.replace(/\/$/, ''));
 	}
 
+	/** A prerendered scenario view hands its own card up through page data. */
+	const card = $derived(page.data.card as CardHead | undefined);
 	const current = $derived(links.find((link) => isActive(link.href)));
-	const description = $derived(current?.description ?? SITE_DESCRIPTION);
-	const ogTitle = $derived(current ? `${current.label} · MAKROskop` : 'MAKROskop – udforsk MAKRO uden licens');
+	const description = $derived(card?.description ?? current?.description ?? SITE_DESCRIPTION);
+	const ogTitle = $derived(card?.title ?? (current ? `${current.label} · MAKROskop` : 'MAKROskop – udforsk MAKRO uden licens'));
+	/** The tab title: the card's headline number, else the page name. Only the layout sets <title>. */
+	const title = $derived(card ? `${card.title} · MAKROskop` : current ? `${current.label} · MAKROskop` : 'MAKROskop');
+	const ogImage = $derived(card ? `${SITE_URL}/og/${card.image}` : `${SITE_URL}/og.png`);
+	const ogImageAlt = $derived(
+		card?.imageAlt ??
+			'MAKROskop: Dansk økonomi, beregnet et århundrede frem – kurve for realt BNP 1985–2100 fra MAKROs grundforløb.'
+	);
 
 	let main: HTMLElement | undefined = $state();
 
@@ -62,19 +70,20 @@
 </script>
 
 <svelte:head>
-	<title>MAKROskop</title>
+	<title>{title}</title>
 	<meta name="description" content={description} />
 	<meta property="og:type" content="website" />
 	<meta property="og:site_name" content="MAKROskop" />
 	<meta property="og:title" content={ogTitle} />
 	<meta property="og:description" content={description} />
-	<meta property="og:image" content="{SITE_URL}/og.png" />
+	<meta property="og:image" content={ogImage} />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
-	<meta
-		property="og:image:alt"
-		content="MAKROskop: Dansk økonomi, beregnet et århundrede frem – kurve for realt BNP 1985–2100 fra MAKROs grundforløb."
-	/>
+	<meta property="og:image:alt" content={ogImageAlt} />
+	{#if card}
+		<link rel="canonical" href={card.url} />
+		<meta property="og:url" content={card.url} />
+	{/if}
 	<meta property="og:locale" content="da_DK" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="theme-color" content="#14AFA6" />

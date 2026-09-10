@@ -61,10 +61,6 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Grundforløb · MAKROskop</title>
-</svelte:head>
-
 <section class="opener">
 	<h1>Dansk økonomi, beregnet et århundrede frem</h1>
 	<p class="lede">

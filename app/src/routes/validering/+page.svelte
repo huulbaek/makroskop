@@ -123,10 +123,6 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Validering · MAKROskop</title>
-</svelte:head>
-
 <section class="intro">
 	<h1>Kan man stole på tallene?</h1>
 	<p class="lede">
