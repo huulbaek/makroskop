@@ -137,6 +137,11 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
   rebuild held 2–3 LUs (61 GB, two OOM kills). Verified 2026-09-05 on Rente_perm: 15 factorizations,
   RSS back to 3–10 GB between each, peak 53.4 GB. Diagnose memory with 30 s RSS samples of the
   solver pid (`memtest/sample.sh` on the box), not with the end-of-run peak alone.
+  Pardiso adds a second rule (makroskop-csi, 2026-09-10): MKL keeps every accepted LU until
+  `free_memory` is called and pypardiso has no destructor, so `release_lu` runs at every point
+  where `solve_window`/`solve_shock` drop a factorization; before that the process grew ~8 GB per
+  fresh factorization and a 2027 Rente run was OOM-killed at its 12th. Invariants are in
+  `tests/test_lu_lifetime.py`.
 - Shock design: instruments must be exogenous (`is_fixed`). Mapped: tBund, tAMbidrag,
   tSelskab, tEjd, uG (offentligt forbrug), uvOvfSats (overførsler), uXMarked, nPop
   (single ages), rRenteECB, pOlieBrent (NB: propagates to almost nothing in this

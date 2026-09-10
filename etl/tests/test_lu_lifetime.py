@@ -85,3 +85,52 @@ def test_continuation_stage_does_not_pin_the_carried_lu(monkeypatch) -> None:
     assert abs(x[0] - np.log(3.0)) < 1e-8
     assert any(carried_and_rebuilt), "no stage entered with a chord LU and rebuilt it"
     assert tracker.stale_at_build == [0] * len(tracker.built)
+
+
+class CleanupTracker(FactorizationTracker):
+    """Solvers with a backend `cleanup` hook (Pardiso: MKL keeps the LU until told to free it,
+    ~8 GB each on the full horizon). Records, at every build, how many earlier solvers were
+    dropped without their hook being called."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.cleaned: list[bool] = []
+        self.uncleaned_at_build: list[int] = []
+
+    def __call__(self, matrix):
+        self.uncleaned_at_build.append(sum(1 for done in self.cleaned if not done))
+        solve = super().__call__(matrix)
+        index = len(self.cleaned)
+        self.cleaned.append(False)
+
+        def cleanup() -> None:
+            assert not self.cleaned[index], "cleanup called twice for one factorization"
+            self.cleaned[index] = True
+
+        solve.cleanup = cleanup
+        return solve
+
+
+def test_dropped_factorizations_release_backend_memory(monkeypatch) -> None:
+    tracker = CleanupTracker()
+    monkeypatch.setattr(fs, "make_direct_solver", tracker)
+    window = ToyWindow()
+    x = np.array([0.0, 1.0])
+
+    fs.solve_shock(None, window, x, np.array([1]), np.array([3.0]), tol=1e-9)
+
+    assert abs(x[0] - np.log(3.0)) < 1e-8
+    assert len(tracker.built) >= 3, "toy problem no longer forces rebuilds"
+    assert tracker.uncleaned_at_build == [0] * len(tracker.built), "an LU was dropped without cleanup"
+    assert all(tracker.cleaned), "the last carried LU was not released when the continuation ended"
+
+
+def test_solve_window_without_holder_releases_its_lu(monkeypatch) -> None:
+    tracker = CleanupTracker()
+    monkeypatch.setattr(fs, "make_direct_solver", tracker)
+    window = ToyWindow()
+    x = np.array([0.0, 3.0])
+
+    fs.solve_window(None, window, x, tol=1e-9, max_iter=12)
+
+    assert all(tracker.cleaned)

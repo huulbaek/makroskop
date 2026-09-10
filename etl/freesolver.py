@@ -1372,6 +1372,18 @@ def worst_residuals(window: "Window", residual_full: np.ndarray, top: int = 5) -
     return ", ".join(f"{names.get(int(sel[i]) + 1, '?')}={residual_full[sel[i]]:.2e}" for i in order)
 
 
+def release_lu(lu) -> None:
+    """Free a dropped factorization's backend memory. Python dropping the solve callable is
+    not enough for Pardiso: MKL keeps the LU (~8 GB each on the full horizon) until told to
+    free it, so eleven accepted factorizations filled the 62 GB box and the twelfth was
+    OOM-killed (Rente_ufin from 2027, 2026-09-10, makroskop-csi)."""
+    if lu is None:
+        return
+    cleanup = getattr(lu[0], "cleanup", None)
+    if cleanup is not None:
+        cleanup()
+
+
 def solve_window(system: System, window: Window, x: np.ndarray,
                  tol: float = 1e-9, max_iter: int = 10, lu_holder: list | None = None) -> float:
     """Newton on the window, mutating x in place. Returns the final ||r||_inf.
@@ -1386,6 +1398,7 @@ def solve_window(system: System, window: Window, x: np.ndarray,
     every local that references it — is released BEFORE the next one is built. Holding
     both peaked at 61 GB and OOM-killed two Rente_perm attempts (makroskop-xn2).
     """
+    own_holder = lu_holder is None  # nobody carries the LU past this call: release it on return
     if lu_holder is None:
         lu_holder = []
     residual_full = np.empty(window.n_eq_total)
@@ -1482,6 +1495,7 @@ def solve_window(system: System, window: Window, x: np.ndarray,
                 print(f"  line search failed with fresh Jacobian (factor {factor_time:.1f}s); stopping",
                       flush=True)
                 break
+            release_lu(lu)
             lu = None  # stale chord LU: rebuild and retry
             continue
 
@@ -1494,6 +1508,7 @@ def solve_window(system: System, window: Window, x: np.ndarray,
               f"alpha = {alpha}  ({note}, factor {factor_time:.1f}s)", flush=True)
         # keep the LU for chord iterations only while contraction is strong
         if not (alpha == 1.0 and reduction <= 0.02):
+            release_lu(lu)
             lu = None
         fresh = False
         # Tiny-alpha grind: on this system alpha <= 1/32 steps shave ~1 % per factorization and
@@ -1504,7 +1519,10 @@ def solve_window(system: System, window: Window, x: np.ndarray,
             print("  stalled on tiny steps (2 iterations, < 10 % progress); stopping", flush=True)
             break
     if lu is not None:
-        lu_holder.append(lu)
+        if own_holder:
+            release_lu(lu)
+        else:
+            lu_holder.append(lu)
     return norm
 
 
@@ -1582,10 +1600,15 @@ def solve_shock(system: System, window: Window, x: np.ndarray, shock_vars: np.nd
                 on_stage(solved_share, checkpoint)
         else:
             step /= 2
+            for lu in carried:
+                release_lu(lu)
             carried.clear()
             if step < 1e-4:
                 raise SystemExit(f"continuation stalled at share {solved_share}")
             save_checkpoint()  # a restart must not replay the failed step sizes
+    for lu in carried:
+        release_lu(lu)
+    carried.clear()
     return tol
 
 
