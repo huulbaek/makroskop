@@ -24,12 +24,12 @@ export const load: PageServerLoad = ({ params }): { card: CardHead } => {
 		error(404, 'Ukendt scenarie');
 	}
 	const scenario = readScenario(params.scenario);
-	if (!scenario.definition || !scaleSteps(scenario.definition.maxScale).includes(scale)) error(404, 'Ukendt scenarie');
+	const definition = scenario.definition;
+	if (!definition || !scaleSteps(definition.maxScale).includes(scale)) error(404, 'Ukendt scenarie');
 	const card = buildCard({
-		shock, scenario, yearStart: meta.yearStart, modelName: meta.model.name,
-		levels: levelsAt(readBaseline(), scenario.definition.firstYear), scale
+		shock, scenario, definition, yearStart: meta.yearStart, modelName: meta.model.name,
+		levels: levelsAt(readBaseline(), definition.firstYear), scale
 	});
-	if (!card) error(404, 'Ukendt scenarie');
 	return {
 		card: {
 			title: card.title,

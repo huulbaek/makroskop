@@ -4,9 +4,9 @@
  *  scenario or definition — a page with a broken card is worse than a failed build. */
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildCard, scaleSteps } from '../src/lib/card';
+import { buildCard, solvedViews } from '../src/lib/card';
 import { cardSvg } from '../src/lib/card-svg';
-import { levelsAt, readBaseline, readMeta, readScenario } from '../src/lib/server/scenarios';
+import { levelsAt, maxScales, readBaseline, readMeta, readScenario } from '../src/lib/server/scenarios';
 import { assertFonts, renderPng } from './render-card';
 
 /** Renders every view (or only the named scenario files) and returns the count. */
@@ -16,20 +16,15 @@ export function generateCards(outDir: string, only?: string[]): number {
 	const meta = readMeta();
 	const baseline = readBaseline();
 	let count = 0;
-	for (const shock of meta.shocks) {
-		for (const variation of shock.available) {
-			const file = `${shock.name}${variation}`;
-			if (only && !only.includes(file)) continue;
-			const scenario = readScenario(file);
-			if (!scenario.definition) throw new Error(`${file}: no shock definition, cannot build a card`);
-			const levels = levelsAt(baseline, scenario.definition.firstYear);
-			for (const scale of scaleSteps(scenario.definition.maxScale)) {
-				const card = buildCard({ shock, scenario, yearStart: meta.yearStart, modelName: meta.model.name, levels, scale });
-				if (!card) throw new Error(`${file}: no card at scale ${scale}`);
-				writeFileSync(join(outDir, card.image), renderPng(cardSvg(card)));
-				count++;
-			}
-		}
+	for (const { shock, file, scale } of solvedViews(meta, maxScales(meta))) {
+		if (only && !only.includes(file)) continue;
+		const scenario = readScenario(file);
+		const definition = scenario.definition;
+		if (!definition) throw new Error(`${file}: no shock definition, cannot build a card`);
+		const levels = levelsAt(baseline, definition.firstYear);
+		const card = buildCard({ shock, scenario, definition, yearStart: meta.yearStart, modelName: meta.model.name, levels, scale });
+		writeFileSync(join(outDir, card.image), renderPng(cardSvg(card)));
+		count++;
 	}
 	return count;
 }

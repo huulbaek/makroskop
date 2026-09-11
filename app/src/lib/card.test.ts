@@ -37,7 +37,7 @@ function scenario(overrides: Partial<Scenario> = {}): Scenario {
 
 const levels = { nL: 3152.44, vBNP: 3877.49 };
 const build = (scale: number, s: Scenario = scenario()) =>
-	buildCard({ shock: rente, scenario: s, yearStart: YEAR_START, modelName: 'MAKRO 2026-June', levels, scale })!;
+	buildCard({ shock: rente, scenario: s, definition: s.definition!, yearStart: YEAR_START, modelName: 'MAKRO 2026-June', levels, scale });
 
 describe('scale steps', () => {
 	it('offers all twelve steps without a cap and trims by magnitude with one', () => {
@@ -87,9 +87,6 @@ describe('formatting', () => {
 	it('scales an "af satsen" change as a plain percentage', () => {
 		expect(changeText({ delta: 0, factor: 1.1, changeDa: '+10 pct. af satsen' }, 1)).toBe('+10 pct. af satsen');
 		expect(changeText({ delta: 0, factor: 1.1, changeDa: '+10 pct. af satsen' }, 0.5)).toBe('+5 pct. af satsen');
-	});
-	it('keeps the existing pct.-point scaling', () => {
-		expect(changeText({ delta: 0.01, factor: 1, changeDa: '+1 pct.-point (100 basispoint)' }, 0.5)).toBe('+0,5 pct.-point');
 	});
 	it('formats a bare scale label with the true minus', () => {
 		expect(scaleLabel(0.5)).toBe('×0,5');
@@ -160,7 +157,7 @@ describe('buildCard', () => {
 			instrumentDa: 'Arbejdsgivernes forhandlingsvægt i lønforhandlingen',
 			delta: -0.01, factor: 1, changeDa: '−1 pct.-point (lønmodtagerne står stærkere)'
 		};
-		const card = buildCard({ shock: loenShock, scenario: s, yearStart: YEAR_START, modelName: 'M', levels, scale: 1 })!;
+		const card = buildCard({ shock: loenShock, scenario: s, definition: s.definition!, yearStart: YEAR_START, modelName: 'M', levels, scale: 1 });
 		expect(card.headline).toBe('Arbejdsgivernes forhandlingsvægt −1 pct.-point');
 	});
 	it('shortens the headline and adds the full change to the subline for a scaled catalog-worded shock', () => {
@@ -178,10 +175,10 @@ describe('buildCard', () => {
 		expect(card.headline).toBe('Øvrige overførsler +10 mia. kr. årligt');
 		expect(card.subline).toBe('Varigt stød');
 	});
-	it('needs baseline levels for persons and a definition at all', () => {
-		const card = buildCard({ shock: rente, scenario: scenario(), yearStart: YEAR_START, modelName: 'M', levels: null, scale: 1 })!;
+	it('needs baseline levels for the persons tile', () => {
+		const s = scenario();
+		const card = buildCard({ shock: rente, scenario: s, definition: s.definition!, yearStart: YEAR_START, modelName: 'M', levels: null, scale: 1 });
 		expect(card.tiles[0].value).toBeNull();
-		expect(buildCard({ shock: rente, scenario: scenario({ definition: null }), yearStart: YEAR_START, modelName: 'M', levels, scale: 1 })).toBeNull();
 	});
 });
 

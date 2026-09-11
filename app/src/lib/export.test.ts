@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { permalink, provenanceLine, scenarioCsv, exportFilename, wrapLines, packagePermalink, packageFilename } from './export';
+import { permalink, provenanceLine, scenarioCsv, exportFilename, packagePermalink, packageFilename } from './export';
 
 describe('permalink', () => {
 	it('is the prerendered view page, scale as a path segment', () => {
@@ -87,23 +87,6 @@ describe('scenarioCsv trimming', () => {
 			provenance: []
 		});
 		expect(csv.split('\n').slice(0, 3)).toEqual(['År;A (pct.)', '2029;0', '2030;1']);
-	});
-});
-
-describe('wrapLines', () => {
-	// a fake measurer: 10 px per character
-	const measure = (s: string) => s.length * 10;
-	it('returns the line unchanged when it fits', () => {
-		expect(wrapLines(measure, 'kort tekst', 200)).toEqual(['kort tekst']);
-	});
-	it('breaks at spaces to fit the width', () => {
-		expect(wrapLines(measure, 'en to tre fire fem seks', 100)).toEqual(['en to tre', 'fire fem', 'seks']);
-	});
-	it('keeps an overlong single word on its own line', () => {
-		expect(wrapLines(measure, 'https://very-long-url-without-spaces x', 100)).toEqual([
-			'https://very-long-url-without-spaces',
-			'x'
-		]);
 	});
 });
 

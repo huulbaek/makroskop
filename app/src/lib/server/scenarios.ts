@@ -5,7 +5,7 @@
  *  script has no `$lib` alias. */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { CardLevels } from '../card';
+import { solvedScenarios, type CardLevels } from '../card';
 import type { Baseline, Meta, Scenario } from '../data';
 
 const DATA_DIR = join(process.cwd(), 'static', 'data');
@@ -35,12 +35,7 @@ export function levelsAt(baseline: Baseline, year: number): CardLevels | null {
 
 /** `definition.maxScale` per solved scenario file, for the entry list and the image step. */
 export function maxScales(meta: Meta): Record<string, number | null> {
-	const caps: Record<string, number | null> = {};
-	for (const shock of meta.shocks) {
-		for (const variation of shock.available) {
-			const file = `${shock.name}${variation}`;
-			caps[file] = readScenario(file).definition?.maxScale ?? null;
-		}
-	}
-	return caps;
+	return Object.fromEntries(
+		solvedScenarios(meta).map(({ file }) => [file, readScenario(file).definition?.maxScale ?? null])
+	);
 }

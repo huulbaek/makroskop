@@ -2,7 +2,7 @@
 	import LineChart from '$lib/components/LineChart.svelte';
 	import StatTile from '$lib/components/StatTile.svelte';
 	import { formatSigned } from '$lib/format';
-	import { ALL_SCALE_STEPS, buildCard, changeText, scaleSteps as stepsFor } from '$lib/card';
+	import { ALL_SCALE_STEPS, cardTiles, changeText, formatScale, scaleSteps as stepsFor } from '$lib/card';
 	import type { CardTile } from '$lib/card';
 	import { loadBaseline, loadScenario, type Meta, type Scenario, type ShockMeta } from '$lib/data';
 	import { page } from '$app/state';
@@ -41,7 +41,6 @@
 	 *  changes come through select()). */
 	let selectedName = $state(untrack(() => initial?.name ?? '_demo'));
 	let selectedVariation = $state(untrack(() => initial?.variation ?? ''));
-	const daScale = new Intl.NumberFormat('da-DK', { maximumFractionDigits: 2 });
 	let override: Scenario | null | 'unset' = $state.raw('unset');
 	let loading = $state(untrack(() => !!initial));
 	/** Baseline nL/vBNP by year (persons tile), fetched once after mount. */
@@ -196,7 +195,7 @@
 	const scenarioLine = $derived.by(() => {
 		const def = scenario?.definition;
 		if (!def) return selectedShock.labelDa;
-		const scaled = scale !== 1 ? ` · ×${daScale.format(scale)} ${mirrored ? 'spejlet' : 'lineær tilnærmelse'}` : '';
+		const scaled = scale !== 1 ? ` · ×${formatScale(scale)} ${mirrored ? 'spejlet' : 'lineær tilnærmelse'}` : '';
 		return `${selectedShock.labelDa}: ${def.changeDa} fra ${def.firstYear}, ${closureLabel.toLowerCase()}${scaled}`;
 	});
 
@@ -207,7 +206,7 @@
 			const year = scenario.definition.firstYear;
 			const at = levelsByYear[year];
 			const levels = at && at.nL != null && at.vBNP != null ? { nL: at.nL, vBNP: at.vBNP } : null;
-			return buildCard({ shock: selectedShock, scenario, yearStart: meta.yearStart, modelName: meta.model.name, levels, scale })?.tiles ?? null;
+			return cardTiles({ scenario, definition: scenario.definition, yearStart: meta.yearStart, levels, scale });
 		}
 		return loading ? initialTiles : null;
 	});
@@ -278,6 +277,14 @@
 		}
 	}
 </script>
+
+{#snippet keyFigures(list: CardTile[])}
+	<div class="key-figures" role="group" aria-label="Nøgletal">
+		{#each list as tile (tile.key)}
+			<StatTile label={`${tile.label}, år ${tile.year}`} value={tile.value ?? '–'} unit={tile.value == null ? '' : tile.unit} />
+		{/each}
+	</div>
+{/snippet}
 
 <section class="intro">
 	<h1>Hvad sker der, hvis&nbsp;…?</h1>
@@ -400,10 +407,10 @@
 							max={scaleSteps.length - 1}
 							step="1"
 							bind:value={scaleIdx}
-							aria-valuetext={`${daScale.format(scale)} gange stødet${mirrored ? ' — spejlet, altså en lempelse' : ''}`}
+							aria-valuetext={`${formatScale(scale)} gange stødet${mirrored ? ' — spejlet, altså en lempelse' : ''}`}
 						/>
 						<output for="scale" class="scale-readout">
-							<span class="scale-value"><strong>×{daScale.format(scale)}</strong> = {scaledChange}</span>
+							<span class="scale-value"><strong>×{formatScale(scale)}</strong> = {scaledChange}</span>
 							<!-- Always rendered: the badge sits next to the slider, so popping it in and out
 							     would resize the track mid-drag. -->
 							<span class="approx" class:blank={scale === 1} class:mirror={mirrored}>
@@ -441,11 +448,7 @@
 
 		{#if scenario}
 			{#if tiles}
-				<div class="key-figures" role="group" aria-label="Nøgletal">
-					{#each tiles as tile (tile.key)}
-						<StatTile label={`${tile.label}, år ${tile.year}`} value={tile.value ?? '–'} unit={tile.value == null ? '' : tile.unit} />
-					{/each}
-				</div>
+				{@render keyFigures(tiles)}
 			{/if}
 			{#if scenario.hbi != null}
 				<div class="hbi-row">
@@ -472,7 +475,7 @@
 					<div class="cell" class:instrument={chart.isInstrument}>
 						{#if scenario.synthetic}<span class="badge warm" aria-hidden="true">Demo</span>{/if}
 						{#if chart.isInstrument}<span class="badge accent">Stødet (input)</span>{/if}
-						{#if scale !== 1 && !chart.isInstrument}<span class="badge warm">×{daScale.format(scale)} {mirrored ? 'spejlet' : 'tilnærmet'}</span>{/if}
+						{#if scale !== 1 && !chart.isInstrument}<span class="badge warm">×{formatScale(scale)} {mirrored ? 'spejlet' : 'tilnærmet'}</span>{/if}
 						<LineChart
 							title={chart.title}
 							code={chart.key}
@@ -502,11 +505,7 @@
 		{:else if loading}
 			<div class="card loading-card">
 				{#if tiles}
-					<div class="key-figures">
-						{#each tiles as tile (tile.key)}
-							<StatTile label={`${tile.label}, år ${tile.year}`} value={tile.value ?? '–'} unit={tile.value == null ? '' : tile.unit} />
-						{/each}
-					</div>
+					{@render keyFigures(tiles)}
 				{/if}
 				<p>Henter scenariet …</p>
 			</div>

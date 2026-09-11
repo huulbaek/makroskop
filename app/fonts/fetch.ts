@@ -24,20 +24,20 @@ async function get(url: string): Promise<Response> {
 
 const css = await (await get(CSS)).text();
 const faces = [...css.matchAll(/@font-face\s*{([^}]*)}/g)].map((m) => m[1]);
-let count = 0;
-for (const face of faces) {
-	const family = /font-family:\s*'([^']+)'/.exec(face)?.[1];
-	const style = /font-style:\s*(\w+)/.exec(face)?.[1];
-	const weight = /font-weight:\s*(\d+)/.exec(face)?.[1];
-	const url = /url\((https:[^)]+\.ttf)\)/.exec(face)?.[1];
-	if (!family || !style || !weight || !url) throw new Error(`unexpected @font-face block:\n${face}`);
-	const name = `${family.replace(/\s+/g, '')}-${style}-${weight}.ttf`;
-	writeFileSync(`${dir}${name}`, new Uint8Array(await (await get(url)).arrayBuffer()));
-	console.log(`${name} <- ${url}`);
-	count++;
-}
-for (const [name, url] of Object.entries(NOTICES)) {
-	writeFileSync(`${dir}${name}`, await (await get(url)).text());
-	console.log(`${name} <- ${url}`);
-}
-if (count !== 6) throw new Error(`expected 6 font files, got ${count}`);
+if (faces.length !== 6) throw new Error(`expected 6 @font-face blocks, got ${faces.length}`);
+await Promise.all([
+	...faces.map(async (face) => {
+		const family = /font-family:\s*'([^']+)'/.exec(face)?.[1];
+		const style = /font-style:\s*(\w+)/.exec(face)?.[1];
+		const weight = /font-weight:\s*(\d+)/.exec(face)?.[1];
+		const url = /url\((https:[^)]+\.ttf)\)/.exec(face)?.[1];
+		if (!family || !style || !weight || !url) throw new Error(`unexpected @font-face block:\n${face}`);
+		const name = `${family.replace(/\s+/g, '')}-${style}-${weight}.ttf`;
+		writeFileSync(`${dir}${name}`, new Uint8Array(await (await get(url)).arrayBuffer()));
+		console.log(`${name} <- ${url}`);
+	}),
+	...Object.entries(NOTICES).map(async ([name, url]) => {
+		writeFileSync(`${dir}${name}`, await (await get(url)).text());
+		console.log(`${name} <- ${url}`);
+	})
+]);

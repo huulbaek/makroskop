@@ -3,10 +3,8 @@
 
 import { viewPath } from './card';
 import { wrapLines } from './text';
-export { wrapLines };
 
-/** Host shown in provenance stamps; override with VITE_SITE_HOST when self-hosting. */
-export const SITE_HOST: string = import.meta.env.VITE_SITE_HOST ?? 'makroskop.nodalit.com';
+import { SITE_HOST } from './site';
 
 export interface PermalinkParams {
 	stod: string;

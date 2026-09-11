@@ -15,6 +15,29 @@ export function scaleSteps(maxScale: number | null | undefined): number[] {
 	return steps.includes(1) ? steps : [...steps, 1].sort((a, b) => a - b);
 }
 
+export interface SolvedScenario {
+	shock: ShockMeta;
+	variation: string;
+	/** the scenario file stem, `<name><variation>` */
+	file: string;
+}
+
+/** Every solved scenario the catalog lists, in catalog order. */
+export function solvedScenarios(meta: Pick<Meta, 'shocks'>): SolvedScenario[] {
+	return meta.shocks.flatMap((shock) =>
+		shock.available.map((variation) => ({ shock, variation, file: `${shock.name}${variation}` }))
+	);
+}
+
+/** Every view that gets a page and an image: each solved scenario at each allowed step. */
+export function solvedViews(
+	meta: Pick<Meta, 'shocks'>, maxScales: Record<string, number | null>
+): (SolvedScenario & { scale: number })[] {
+	return solvedScenarios(meta).flatMap((solved) =>
+		scaleSteps(maxScales[solved.file]).map((scale) => ({ ...solved, scale }))
+	);
+}
+
 export interface CardLevels {
 	/** baseline structural employment in the shock year, thousand persons */
 	nL: number;
@@ -93,10 +116,15 @@ export function scalableChange(def: Pick<ScenarioDefinition, 'delta' | 'factor'>
 	return (def.delta !== 0 && def.factor === 1 && Math.abs(def.delta) < 1) || (def.delta === 0 && def.factor > 1);
 }
 
-/** A bare "×<scale>" label, true minus — the short image headline for a scaled shock whose
- *  full change text (catalog changeDa plus the "af standardstødet" note) is too long to fit. */
+/** The scale as a bare Danish number with the true minus ("0,5", "−1"). */
+export function formatScale(scale: number): string {
+	return daScale.format(scale).replace('-', MINUS);
+}
+
+/** "×<scale>" — the short image headline for a scaled shock whose full change text (catalog
+ *  changeDa plus the "af standardstødet" note) is too long to fit. */
 export function scaleLabel(scale: number): string {
-	return `×${daScale.format(scale).replace('-', MINUS)}`;
+	return `×${formatScale(scale)}`;
 }
 
 /** The shock size in the instrument's own unit, the page's rule. */
@@ -154,42 +182,55 @@ export function splitView(param: string, suffixes: string[]): { name: string; va
 	return null;
 }
 
-/** Every prerendered view: one entry per solved scenario and allowed step. */
+/** The prerender entry list: one `{ scenario, skala? }` per view (`skala` absent at the solved size). */
 export function shareViews(
 	meta: Pick<Meta, 'shocks'>, maxScales: Record<string, number | null>
 ): { scenario: string; skala?: string }[] {
-	const views: { scenario: string; skala?: string }[] = [];
-	for (const shock of meta.shocks) {
-		for (const variation of shock.available) {
-			const file = `${shock.name}${variation}`;
-			for (const step of scaleSteps(maxScales[file])) {
-				views.push(step === 1 ? { scenario: file } : { scenario: file, skala: String(step) });
-			}
-		}
-	}
-	return views;
+	return solvedViews(meta, maxScales).map(({ file, scale }) =>
+		scale === 1 ? { scenario: file } : { scenario: file, skala: String(scale) }
+	);
 }
 
-export function buildCard(input: {
-	shock: ShockMeta; scenario: Scenario; yearStart: number; modelName: string; levels: CardLevels | null; scale: number;
-}): CardData | null {
-	const { shock, scenario, yearStart, levels, scale } = input;
-	const def = scenario.definition;
-	if (!def) return null;
-	const at = (key: string, year: number): number | null => {
+/** Scaled deviation of a series in a calendar year, null where the series has no value. */
+function deviationAt(scenario: Pick<Scenario, 'deviations'>, yearStart: number, scale: number) {
+	return (key: string, year: number): number | null => {
 		const value = scenario.deviations[key]?.[year - yearStart];
 		return value == null ? null : value * scale;
 	};
-	const y1 = def.firstYear;
+}
+
+export interface TileInput {
+	scenario: Pick<Scenario, 'deviations'>;
+	definition: Pick<ScenarioDefinition, 'firstYear'>;
+	yearStart: number;
+	levels: CardLevels | null;
+	scale: number;
+}
+
+/** The three fixed headline figures, in layout order: Beskæftigelse år 1 (persons), BNP år 3,
+ *  Offentlig saldo år 1. Cheap enough for the page to recompute on every slider step. */
+export function cardTiles({ scenario, definition, yearStart, levels, scale }: TileInput): CardTile[] {
+	const at = deviationAt(scenario, yearStart, scale);
+	const y1 = definition.firstYear;
 	const employment = at('nL', y1);
 	const gdp = at('qBNP', y1 + 2);
 	const balance = at('saldo2bnp', y1);
-	const tiles: CardTile[] = [
+	return [
 		{ key: 'nL', label: 'Beskæftigelse', year: 1, unit: 'personer',
 			value: employment == null || levels == null ? null : formatPersons((employment / 100) * levels.nL * 1000) },
 		{ key: 'qBNP', label: 'BNP', year: 3, unit: 'pct.', value: gdp == null ? null : formatTileValue(gdp) },
 		{ key: 'saldo2bnp', label: 'Offentlig saldo', year: 1, unit: 'pct. af BNP', value: balance == null ? null : formatTileValue(balance) }
 	];
+}
+
+export function buildCard(input: {
+	shock: ShockMeta; scenario: Scenario; definition: ScenarioDefinition; yearStart: number; modelName: string;
+	levels: CardLevels | null; scale: number;
+}): CardData {
+	const { shock, scenario, definition: def, yearStart, levels, scale } = input;
+	const at = deviationAt(scenario, yearStart, scale);
+	const y1 = def.firstYear;
+	const tiles = cardTiles({ scenario, definition: def, yearStart, levels, scale });
 	const [persons, bnp, saldo] = tiles;
 
 	const instrument = INSTRUMENT_SHORT[shock.name] ?? (def.instrumentDa.length <= MAX_INSTRUMENT_CHARS ? def.instrumentDa : shock.labelDa);

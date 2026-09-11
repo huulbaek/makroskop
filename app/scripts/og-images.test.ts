@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { buildCard, scaleSteps } from '../src/lib/card';
+import { buildCard, solvedViews } from '../src/lib/card';
 import { fitHeadline } from '../src/lib/card-svg';
 import { levelsAt, maxScales, readBaseline, readMeta, readScenario, scenarioExists } from '../src/lib/server/scenarios';
 import { generateCards } from './og-images';
@@ -30,21 +30,15 @@ describe('every real headline fits the image', () => {
 		const meta = readMeta();
 		const baseline = readBaseline();
 		let checked = 0;
-		for (const shock of meta.shocks) {
-			for (const variation of shock.available) {
-				const file = `${shock.name}${variation}`;
-				const scenario = readScenario(file);
-				if (!scenario.definition) throw new Error(`${file}: no shock definition, cannot build a card`);
-				const levels = levelsAt(baseline, scenario.definition.firstYear);
-				for (const scale of scaleSteps(scenario.definition.maxScale)) {
-					const card = buildCard({ shock, scenario, yearStart: meta.yearStart, modelName: meta.model.name, levels, scale });
-					if (!card) throw new Error(`${file}: no card at scale ${scale}`);
-					const { size, lines } = fitHeadline(card.headline);
-					expect(lines.join(' ')).toBe(card.headline);
-					for (const line of lines) expect(line.length * DISPLAY_EM * size).toBeLessThanOrEqual(HEADLINE_WIDTH);
-					checked++;
-				}
-			}
+		for (const { shock, file, scale } of solvedViews(meta, maxScales(meta))) {
+			const scenario = readScenario(file);
+			const definition = scenario.definition!;
+			const levels = levelsAt(baseline, definition.firstYear);
+			const card = buildCard({ shock, scenario, definition, yearStart: meta.yearStart, modelName: meta.model.name, levels, scale });
+			const { size, lines } = fitHeadline(card.headline);
+			expect(lines.join(' ')).toBe(card.headline);
+			for (const line of lines) expect(line.length * DISPLAY_EM * size).toBeLessThanOrEqual(HEADLINE_WIDTH);
+			checked++;
 		}
 		expect(checked).toBe(932);
 	});
